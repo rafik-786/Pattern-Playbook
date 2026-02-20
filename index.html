@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pattern Playbook — Design Patterns in C# / .NET</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📘</text></svg>">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg-primary: #0f172a;
+  --bg-secondary: #1e293b;
+  --bg-tertiary: #334155;
+  --accent-blue: #3b82f6;
+  --accent-purple: #8b5cf6;
+  --accent-green: #10b981;
+  --accent-red: #ef4444;
+  --accent-yellow: #f59e0b;
+  --accent-cyan: #06b6d4;
+  --text-primary: #f1f5f9;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --border-color: #334155;
+}
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  line-height: 1.6;
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--bg-secondary); }
+::-webkit-scrollbar-thumb { background: var(--bg-tertiary); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--accent-blue); }
+
+/* Hero */
+.hero {
+  text-align: center;
+  padding: 5rem 2rem 3rem;
+  position: relative;
+  overflow: hidden;
+}
+.hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle at 50% 50%, rgba(59,130,246,0.08) 0%, transparent 50%);
+  animation: pulse 8s ease-in-out infinite;
+}
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.1); }
+}
+.hero-icon {
+  font-size: 3.5rem;
+  margin-bottom: 1.5rem;
+  position: relative;
+  display: inline-block;
+}
+.hero-icon i {
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero h1 {
+  font-size: 3.5rem;
+  font-weight: 900;
+  background: linear-gradient(135deg, #3b82f6, #8b5cf6, #06b6d4);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 0.75rem;
+  position: relative;
+}
+.hero .subtitle {
+  font-size: 1.25rem;
+  color: var(--text-secondary);
+  font-weight: 400;
+  position: relative;
+}
+.hero .subtitle span {
+  color: var(--accent-blue);
+  font-weight: 600;
+}
+
+/* Stats bar */
+.stats-bar {
+  display: flex;
+  justify-content: center;
+  gap: 2.5rem;
+  padding: 1.5rem 2rem;
+  margin: 0 auto 2rem;
+  max-width: 700px;
+  position: relative;
+}
+.stat {
+  text-align: center;
+}
+.stat-num {
+  font-size: 2rem;
+  font-weight: 800;
+  font-family: 'JetBrains Mono', monospace;
+  background: linear-gradient(135deg, var(--accent-blue), var(--accent-cyan));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.stat-label {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+/* Category section */
+.main-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 2rem 4rem;
+  flex: 1;
+}
+.category {
+  margin-bottom: 3rem;
+}
+.category-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1.25rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+.category-header i {
+  font-size: 1.25rem;
+}
+.category-header h2 {
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+.category-creational { color: var(--accent-blue); }
+.category-structural { color: var(--accent-green); }
+.category-behavioral { color: var(--accent-purple); }
+
+/* Card grid */
+.card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.25rem;
+}
+
+/* Pattern card */
+.pattern-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1.75rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+  display: block;
+}
+.pattern-card.ready {
+  cursor: pointer;
+}
+.pattern-card.ready:hover {
+  border-color: var(--accent-blue);
+  transform: translateY(-4px);
+  box-shadow: 0 12px 40px rgba(59,130,246,0.15);
+}
+.pattern-card.ready::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--accent-blue), var(--accent-purple));
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.pattern-card.ready:hover::after {
+  opacity: 1;
+}
+.pattern-card.coming-soon {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Card content */
+.card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+}
+.card-icon-creational { background: rgba(59,130,246,0.15); color: var(--accent-blue); }
+.card-icon-structural { background: rgba(16,185,129,0.15); color: var(--accent-green); }
+.card-icon-behavioral { background: rgba(139,92,246,0.15); color: var(--accent-purple); }
+
+.card-number {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  background: rgba(100,116,139,0.1);
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}
+
+.card-name {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.card-desc {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+.badge-ready {
+  background: rgba(16,185,129,0.15);
+  color: var(--accent-green);
+}
+.badge-soon {
+  background: rgba(100,116,139,0.1);
+  color: var(--text-muted);
+}
+.badge-category {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.2rem 0.6rem;
+  border-radius: 6px;
+}
+.badge-creational { background: rgba(59,130,246,0.1); color: #93c5fd; }
+.badge-structural { background: rgba(16,185,129,0.1); color: #6ee7b7; }
+.badge-behavioral { background: rgba(139,92,246,0.1); color: #c4b5fd; }
+
+.card-arrow {
+  color: var(--text-muted);
+  transition: transform 0.3s, color 0.3s;
+}
+.pattern-card.ready:hover .card-arrow {
+  transform: translateX(4px);
+  color: var(--accent-blue);
+}
+
+/* Footer */
+.site-footer {
+  text-align: center;
+  padding: 2.5rem 2rem;
+  border-top: 1px solid var(--border-color);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+.site-footer a {
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+.site-footer a:hover {
+  text-decoration: underline;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+  .hero h1 { font-size: 2.25rem; }
+  .hero .subtitle { font-size: 1rem; }
+  .stats-bar { gap: 1.5rem; }
+  .stat-num { font-size: 1.5rem; }
+  .card-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body>
+
+<header class="hero">
+  <div class="hero-icon"><i class="fa-solid fa-book-open"></i></div>
+  <h1>Pattern Playbook</h1>
+  <p class="subtitle">Design Patterns in <span>C# / .NET</span> — Deep Dive Wiki</p>
+</header>
+
+<div class="stats-bar">
+  <div class="stat">
+    <div class="stat-num">8</div>
+    <div class="stat-label">Patterns</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">25</div>
+    <div class="stat-label">Q&As Each</div>
+  </div>
+  <div class="stat">
+    <div class="stat-num">C#</div>
+    <div class="stat-label">.NET 8+</div>
+  </div>
+</div>
+
+<main class="main-content">
+
+  <!-- Creational -->
+  <section class="category">
+    <div class="category-header category-creational">
+      <i class="fa-solid fa-hammer"></i>
+      <h2>Creational Patterns</h2>
+    </div>
+    <div class="card-grid">
+
+      <a href="patterns/singleton.html" class="pattern-card ready">
+        <div class="card-top">
+          <div class="card-icon card-icon-creational"><i class="fa-solid fa-fingerprint"></i></div>
+          <span class="card-number">#01</span>
+        </div>
+        <div class="card-name">Singleton</div>
+        <div class="card-desc">Ensure a class has only one instance with a global access point. Thread safety, Lazy&lt;T&gt;, DI containers.</div>
+        <div class="card-footer">
+          <span class="badge badge-ready"><i class="fa-solid fa-check-circle"></i> Ready</span>
+          <i class="fa-solid fa-arrow-right card-arrow"></i>
+        </div>
+      </a>
+
+      <a href="patterns/factory-method.html" class="pattern-card ready">
+        <div class="card-top">
+          <div class="card-icon card-icon-creational"><i class="fa-solid fa-industry"></i></div>
+          <span class="card-number">#02</span>
+        </div>
+        <div class="card-name">Factory Method</div>
+        <div class="card-desc">Define an interface for creating objects, letting subclasses decide which class to instantiate.</div>
+        <div class="card-footer">
+          <span class="badge badge-ready"><i class="fa-solid fa-check-circle"></i> Ready</span>
+          <i class="fa-solid fa-arrow-right card-arrow"></i>
+        </div>
+      </a>
+
+      <div class="pattern-card coming-soon">
+        <div class="card-top">
+          <div class="card-icon card-icon-creational"><i class="fa-solid fa-cubes-stacked"></i></div>
+          <span class="card-number">#05</span>
+        </div>
+        <div class="card-name">Builder</div>
+        <div class="card-desc">Separate construction of a complex object from its representation using step-by-step building.</div>
+        <div class="card-footer">
+          <span class="badge badge-soon"><i class="fa-regular fa-clock"></i> Coming Soon</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Structural -->
+  <section class="category">
+    <div class="category-header category-structural">
+      <i class="fa-solid fa-puzzle-piece"></i>
+      <h2>Structural Patterns</h2>
+    </div>
+    <div class="card-grid">
+
+      <div class="pattern-card coming-soon">
+        <div class="card-top">
+          <div class="card-icon card-icon-structural"><i class="fa-solid fa-plug"></i></div>
+          <span class="card-number">#06</span>
+        </div>
+        <div class="card-name">Adapter</div>
+        <div class="card-desc">Convert the interface of a class into another interface clients expect. Bridge incompatible interfaces.</div>
+        <div class="card-footer">
+          <span class="badge badge-soon"><i class="fa-regular fa-clock"></i> Coming Soon</span>
+        </div>
+      </div>
+
+      <div class="pattern-card coming-soon">
+        <div class="card-top">
+          <div class="card-icon card-icon-structural"><i class="fa-solid fa-layer-group"></i></div>
+          <span class="card-number">#07</span>
+        </div>
+        <div class="card-name">Decorator</div>
+        <div class="card-desc">Attach additional responsibilities to an object dynamically. Flexible alternative to subclassing.</div>
+        <div class="card-footer">
+          <span class="badge badge-soon"><i class="fa-regular fa-clock"></i> Coming Soon</span>
+        </div>
+      </div>
+
+      <div class="pattern-card coming-soon">
+        <div class="card-top">
+          <div class="card-icon card-icon-structural"><i class="fa-solid fa-building"></i></div>
+          <span class="card-number">#08</span>
+        </div>
+        <div class="card-name">Facade</div>
+        <div class="card-desc">Provide a unified interface to a set of interfaces in a subsystem. Simplify complex systems.</div>
+        <div class="card-footer">
+          <span class="badge badge-soon"><i class="fa-regular fa-clock"></i> Coming Soon</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Behavioral -->
+  <section class="category">
+    <div class="category-header category-behavioral">
+      <i class="fa-solid fa-arrows-split-up-and-left"></i>
+      <h2>Behavioral Patterns</h2>
+    </div>
+    <div class="card-grid">
+
+      <a href="patterns/observer.html" class="pattern-card ready">
+        <div class="card-top">
+          <div class="card-icon card-icon-behavioral"><i class="fa-solid fa-bell"></i></div>
+          <span class="card-number">#03</span>
+        </div>
+        <div class="card-name">Observer</div>
+        <div class="card-desc">Define a one-to-many dependency so when one object changes state, all dependents are notified.</div>
+        <div class="card-footer">
+          <span class="badge badge-ready"><i class="fa-solid fa-check-circle"></i> Ready</span>
+        </div>
+      </a>
+
+      <div class="pattern-card coming-soon">
+        <div class="card-top">
+          <div class="card-icon card-icon-behavioral"><i class="fa-solid fa-route"></i></div>
+          <span class="card-number">#04</span>
+        </div>
+        <div class="card-name">Strategy</div>
+        <div class="card-desc">Define a family of algorithms, encapsulate each one, and make them interchangeable at runtime.</div>
+        <div class="card-footer">
+          <span class="badge badge-soon"><i class="fa-regular fa-clock"></i> Coming Soon</span>
+        </div>
+      </div>
+
+    </div>
+  </section>
+
+</main>
+
+<footer class="site-footer">
+  <p><strong>Pattern Playbook</strong> — 8 GoF Design Patterns in C# / .NET</p>
+  <p style="margin-top:0.5rem;">Built with <i class="fa-solid fa-heart" style="color:var(--accent-red);"></i> for learning</p>
+  <p style="margin-top:1rem;font-size:0.8rem;color:var(--text-muted);">&copy; 2026 Rafikul Alam. All rights reserved.</p>
+</footer>
+
+</body>
+</html>
