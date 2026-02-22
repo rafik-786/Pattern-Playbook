@@ -227,6 +227,9 @@ ul.styled li:last-child{border-bottom:none;}
 ul.styled li::before{content:'▸';position:absolute;left:0;color:var(--accent-blue);font-size:0.8rem;top:0.6rem;}
 ul.styled.green li::before{color:var(--accent-green);}
 ul.styled.red li::before{color:var(--accent-red);content:'✗';}
+ul.styled.cyan li::before{color:var(--accent-cyan);}
+ul.styled.yellow li::before{color:var(--accent-yellow);}
+ul.styled.purple li::before{color:var(--accent-purple);}
 .tab-container{background:var(--glass-bg);border:1px solid var(--glass-border);border-radius:0.75rem;overflow:hidden;margin-bottom:1.5rem;}
 .tab-header{display:flex;background:rgba(0,0,0,0.2);border-bottom:1px solid var(--border-color);overflow-x:auto;}
 .tab-btn{padding:0.75rem 1.25rem;cursor:pointer;font-size:0.85rem;font-weight:600;color:var(--text-muted);border-bottom:2px solid transparent;white-space:nowrap;transition:color 0.2s,border-color 0.2s;background:none;border-top:none;border-left:none;border-right:none;}
@@ -358,23 +361,23 @@ p.body-text{color:var(--text-secondary);font-size:0.95rem;margin-bottom:0.75rem;
         <tbody>
           <tr>
             <td><strong>The menu</strong> — says "we serve pizzas" but doesn't say how each branch makes them</td>
-            <td><strong>Creator (abstract class)</strong> — defines a method <code>CreateProcessor()</code> but lets each subclass decide what to return</td>
+            <td><strong>Creator (abstract class)</strong> — declares a method <code>CreateProduct()</code> but doesn't decide what gets created — that's up to each subclass</td>
           </tr>
           <tr>
             <td><strong>New York branch</strong> — makes thin-crust style pizza when you order</td>
-            <td><strong>ConcreteCreator</strong> (e.g., <code>StripeProcessorFactory</code>) — returns a specific implementation</td>
+            <td><strong>ConcreteCreator</strong> — a subclass that overrides <code>CreateProduct()</code> and returns one specific type of product</td>
           </tr>
           <tr>
             <td><strong>"A pizza"</strong> — the general idea of what you're ordering</td>
-            <td><strong>Product (interface)</strong> — the contract: <code>IPaymentProcessor</code> with methods like <code>Process()</code>, <code>Refund()</code></td>
+            <td><strong>Product (interface)</strong> — the contract that all products share: common methods every product must implement</td>
           </tr>
           <tr>
             <td><strong>The actual thin-crust pepperoni you receive</strong> — the real thing in your hand</td>
-            <td><strong>ConcreteProduct</strong> (e.g., <code>StripePaymentProcessor</code>) — the actual object that does the work</td>
+            <td><strong>ConcreteProduct</strong> — the actual class that implements the Product interface and does the real work</td>
           </tr>
           <tr>
             <td><strong>Opening a Chicago branch</strong> — new style, zero changes to the menu or other branches</td>
-            <td><strong>Open/Closed Principle</strong> — add <code>PayPalProcessorFactory</code> without touching existing code</td>
+            <td><strong>Open/Closed Principle</strong> — add a new ConcreteCreator without touching any existing code</td>
           </tr>
         </tbody>
       </table>
@@ -382,7 +385,7 @@ p.body-text{color:var(--text-secondary);font-size:0.95rem;margin-bottom:0.75rem;
     <div class="callout callout-success">
       <div class="callout-title"><i class="fa-solid fa-circle-check"></i> Why This Analogy Works</div>
       <ul class="styled green">
-        <li>You (the customer) never go into the kitchen — your code never uses <code>new StripeProcessor()</code> directly</li>
+        <li>You (the customer) never go into the kitchen — your code never calls <code>new ConcreteProduct()</code> directly</li>
         <li>Every branch follows the same menu — every factory returns something that implements the same interface</li>
         <li>Adding a new branch doesn't change existing branches — adding a new factory doesn't change existing ones</li>
       </ul>
@@ -444,23 +447,23 @@ p.body-text{color:var(--text-secondary);font-size:0.95rem;margin-bottom:0.75rem;
     <p style="font-style:italic;font-size:1.05rem;">"Define an interface for creating an object, but let subclasses decide which class to instantiate. Factory Method lets a class defer instantiation to subclasses."</p>
     <div class="table-wrapper" style="margin-top:1rem;">
       <table>
-        <thead><tr><th>Phrase</th><th>What It Actually Means</th></tr></thead>
+        <thead><tr><th>Phrase</th><th>What It Actually Means (in Plain English)</th></tr></thead>
         <tbody>
           <tr>
             <td><strong>"Define an interface for creating an object"</strong></td>
-            <td>The abstract Creator declares a method — <code>CreateProcessor()</code> — that returns a Product interface. The <em>how</em> of creation is deliberately left undefined at this level. This gives the system a stable creation contract without coupling to any concrete type.</td>
+            <td>The base class (Creator) declares a method — <code>CreateProduct()</code> — that returns a Product interface. It says <em>"I need a product to do my work, but I won't decide which one."</em> The how of creation is deliberately left blank. This gives the system a stable contract: everyone knows a product will be created, but nobody is locked into a specific type.</td>
           </tr>
           <tr>
             <td><strong>"but let subclasses decide which class to instantiate"</strong></td>
-            <td>Each ConcreteCreator overrides the factory method to return its specific product. <code>StripeProcessorFactory</code> returns <code>new StripePaymentProcessor()</code>. <code>PayPalProcessorFactory</code> returns <code>new PayPalPaymentProcessor()</code>. The decision lives in the subclass, not in any conditional logic.</td>
+            <td>Each subclass (ConcreteCreator) overrides <code>CreateProduct()</code> and fills in the blank with its own specific product. ConcreteCreatorA returns <code>new ConcreteProductA()</code>. ConcreteCreatorB returns <code>new ConcreteProductB()</code>. The decision of <em>which</em> product to create lives in the subclass — not in a giant if/else or switch statement.</td>
           </tr>
           <tr>
             <td><strong>"Factory Method lets a class defer instantiation to subclasses"</strong></td>
-            <td>The Creator's business logic (e.g., <code>ProcessPayment()</code>) uses the product returned by <code>CreateProcessor()</code> without knowing which concrete type it is. The Creator is "complete" at the abstract level — it just defers <em>which</em> product to create down the hierarchy.</td>
+            <td>The Creator's business logic calls <code>CreateProduct()</code> and then uses the result — without ever knowing which concrete type it got back. The Creator is "complete" at the abstract level. It defines the workflow (validate → create → execute → log), but leaves the "create" step as a blank slot for subclasses to fill in. This is also the <strong>Template Method</strong> pattern applied to object creation.</td>
           </tr>
           <tr>
             <td><strong>The structural result</strong></td>
-            <td>Two parallel class hierarchies emerge: Creator hierarchy (abstract factory + concrete factories) mirrors the Product hierarchy (interface + concrete products). Each pair — <code>StripeProcessorFactory</code> + <code>StripePaymentProcessor</code> — is cohesive, isolated, and independently extensible.</td>
+            <td>Two parallel class hierarchies emerge: the Creator hierarchy (abstract Creator + concrete creator subclasses) mirrors the Product hierarchy (Product interface + concrete product implementations). Each pair — one ConcreteCreator + one ConcreteProduct — is cohesive, isolated, and independently extensible. Adding a new variant means adding one class to each hierarchy, touching zero existing code.</td>
           </tr>
         </tbody>
       </table>
@@ -468,144 +471,112 @@ p.body-text{color:var(--text-secondary);font-size:0.95rem;margin-bottom:0.75rem;
   </div>
 
   <h3 class="sub">The Four Participants</h3>
+  <p class="body-text">Every Factory Method implementation has exactly four roles. Learn these generically first — you'll see them come alive with real Payment Gateway code in <strong>Section 6</strong>.</p>
   <div class="grid-2" style="margin-bottom:1.5rem;">
     <div style="padding:1rem;border:1px solid rgba(59,130,246,0.2);border-radius:0.75rem;background:rgba(59,130,246,0.05);">
-      <div style="font-weight:700;color:var(--accent-blue);margin-bottom:0.5rem;font-size:0.95rem;"><i class="fa-solid fa-shapes"></i> Product — IPaymentProcessor</div>
-      <p style="font-size:0.9rem;color:var(--text-secondary);">The interface or abstract class that all concrete products implement. Defines the operations the client code will use. In our domain: <code>IPaymentProcessor</code> with <code>ProcessAsync()</code>, <code>RefundAsync()</code>, and <code>ValidateAsync()</code>. Client code only ever sees this type — it is shielded from all concrete implementations.</p>
+      <div style="font-weight:700;color:var(--accent-blue);margin-bottom:0.5rem;font-size:0.95rem;"><i class="fa-solid fa-shapes"></i> Product (Interface)</div>
+      <p style="font-size:0.9rem;color:var(--text-secondary);">The interface or abstract class that defines what a product <em>can do</em> — its public methods and properties. Client code only ever sees this type, never a specific implementation. This is the contract that all concrete products must follow. Think of it as a job description: "any product that fills this role must be able to do X, Y, and Z."</p>
+      <p style="font-size:0.8rem;color:var(--accent-blue);margin-top:0.5rem;"><i class="fa-solid fa-arrow-right"></i> In Section 6: <code>IPaymentProcessor</code></p>
     </div>
     <div style="padding:1rem;border:1px solid rgba(139,92,246,0.2);border-radius:0.75rem;background:rgba(139,92,246,0.05);">
-      <div style="font-weight:700;color:var(--accent-purple);margin-bottom:0.5rem;font-size:0.95rem;"><i class="fa-solid fa-cube"></i> ConcreteProduct — StripePaymentProcessor</div>
-      <p style="font-size:0.9rem;color:var(--text-secondary);">Implements the Product interface with provider-specific logic. Knows about Stripe's SDK, error codes, retry rules, and webhook format. Is entirely isolated — <code>PayPalPaymentProcessor</code> has zero knowledge of Stripe's implementation details, and vice versa. Adding a new provider never touches existing ConcreteProducts.</p>
+      <div style="font-weight:700;color:var(--accent-purple);margin-bottom:0.5rem;font-size:0.95rem;"><i class="fa-solid fa-cube"></i> ConcreteProduct</div>
+      <p style="font-size:0.9rem;color:var(--text-secondary);">A specific implementation of the Product interface. Each ConcreteProduct knows its own internal details but hides them behind the shared interface. ConcreteProductA has zero knowledge of ConcreteProductB's internals, and vice versa. Adding a new variant never touches existing ConcreteProducts — they are fully isolated from each other.</p>
+      <p style="font-size:0.8rem;color:var(--accent-purple);margin-top:0.5rem;"><i class="fa-solid fa-arrow-right"></i> In Section 6: <code>StripePaymentProcessor</code>, <code>PayPalPaymentProcessor</code></p>
     </div>
     <div style="padding:1rem;border:1px solid rgba(16,185,129,0.2);border-radius:0.75rem;background:rgba(16,185,129,0.05);">
-      <div style="font-weight:700;color:var(--accent-green);margin-bottom:0.5rem;font-size:0.95rem;"><i class="fa-solid fa-building-columns"></i> Creator — PaymentProcessorFactory</div>
-      <p style="font-size:0.9rem;color:var(--text-secondary);">Abstract class that declares the factory method <code>CreateProcessor()</code> and defines the workflow template (Template Method pattern). Contains business logic that uses the product — e.g., <code>ProcessPayment()</code> which calls <code>CreateProcessor()</code> then uses its result. Creator is "complete" minus the creation decision.</p>
+      <div style="font-weight:700;color:var(--accent-green);margin-bottom:0.5rem;font-size:0.95rem;"><i class="fa-solid fa-building-columns"></i> Creator (Abstract Class)</div>
+      <p style="font-size:0.9rem;color:var(--text-secondary);">The abstract base class that declares the factory method <code>CreateProduct()</code> and defines the business workflow. It contains all the logic that uses the product — validate input, create it, execute, log the result — but leaves the "which product to create" decision as an abstract method. The Creator is "complete" minus the creation decision. This is the Template Method pattern applied to creation.</p>
+      <p style="font-size:0.8rem;color:var(--accent-green);margin-top:0.5rem;"><i class="fa-solid fa-arrow-right"></i> In Section 6: <code>PaymentProcessorFactory</code></p>
     </div>
     <div style="padding:1rem;border:1px solid rgba(245,158,11,0.2);border-radius:0.75rem;background:rgba(245,158,11,0.05);">
-      <div style="font-weight:700;color:var(--accent-yellow);margin-bottom:0.5rem;font-size:0.95rem;"><i class="fa-solid fa-industry"></i> ConcreteCreator — StripeProcessorFactory</div>
-      <p style="font-size:0.9rem;color:var(--text-secondary);">Overrides <code>CreateProcessor()</code> to return the specific concrete product. Is the only class that references <code>new StripePaymentProcessor()</code> — this coupling is intentional and fully contained. Inherits all the Creator's workflow logic for free. Adding a new provider means adding one new ConcreteCreator class, nothing more.</p>
+      <div style="font-weight:700;color:var(--accent-yellow);margin-bottom:0.5rem;font-size:0.95rem;"><i class="fa-solid fa-industry"></i> ConcreteCreator</div>
+      <p style="font-size:0.9rem;color:var(--text-secondary);">A subclass that overrides <code>CreateProduct()</code> to return one specific ConcreteProduct. This is the <em>only</em> class that references <code>new ConcreteProductA()</code> directly — the coupling is intentional and fully contained in this one spot. It inherits all the Creator's workflow logic for free. Adding a new variant = adding one new ConcreteCreator class, nothing more.</p>
+      <p style="font-size:0.8rem;color:var(--accent-yellow);margin-top:0.5rem;"><i class="fa-solid fa-arrow-right"></i> In Section 6: <code>StripeProcessorFactory</code>, <code>PayPalProcessorFactory</code></p>
     </div>
   </div>
 
-  <h3 class="sub">UML Class Diagram — Payment Processing Domain</h3>
+  <h3 class="sub">UML Class Diagram — Generic Pattern Structure</h3>
   <div class="mermaid-container">
     <span class="diagram-hint"><i class="fa-solid fa-up-down-left-right"></i> Scroll &amp; pinch to zoom</span>
     <div class="mermaid">
 classDiagram
-    class IPaymentProcessor {
+    class IProduct {
         &lt;&lt;interface&gt;&gt;
-        +ProcessAsync(request PaymentRequest) Task~PaymentResult~
-        +RefundAsync(transactionId string) Task~RefundResult~
-        +ValidateAsync(request PaymentRequest) Task~bool~
-        +GetSupportedCurrencies() List~string~
+        +Execute(request) Result
+        +Validate(request) bool
     }
-    class StripePaymentProcessor {
-        -_stripeClient StripeClient
-        -_webhookSecret string
-        +ProcessAsync(request PaymentRequest) Task~PaymentResult~
-        +RefundAsync(transactionId string) Task~RefundResult~
-        +ValidateAsync(request PaymentRequest) Task~bool~
-        +GetSupportedCurrencies() List~string~
+    class ConcreteProductA {
+        -_config ConfigA
+        +Execute(request) Result
+        +Validate(request) bool
     }
-    class PayPalPaymentProcessor {
-        -_paypalClient PayPalHttpClient
-        -_clientId string
-        +ProcessAsync(request PaymentRequest) Task~PaymentResult~
-        +RefundAsync(transactionId string) Task~RefundResult~
-        +ValidateAsync(request PaymentRequest) Task~bool~
-        +GetSupportedCurrencies() List~string~
+    class ConcreteProductB {
+        -_config ConfigB
+        +Execute(request) Result
+        +Validate(request) bool
     }
-    class SquarePaymentProcessor {
-        -_squareClient SquareClient
-        +ProcessAsync(request PaymentRequest) Task~PaymentResult~
-        +RefundAsync(transactionId string) Task~RefundResult~
-        +ValidateAsync(request PaymentRequest) Task~bool~
-        +GetSupportedCurrencies() List~string~
-    }
-    class ApplePayProcessor {
-        -_merchantId string
-        -_domainVerification string
-        +ProcessAsync(request PaymentRequest) Task~PaymentResult~
-        +RefundAsync(transactionId string) Task~RefundResult~
-        +ValidateAsync(request PaymentRequest) Task~bool~
-        +GetSupportedCurrencies() List~string~
-    }
-    class PaymentProcessorFactory {
+    class Creator {
         &lt;&lt;abstract&gt;&gt;
-        +CreateProcessor() IPaymentProcessor
-        +ProcessPayment(request PaymentRequest) Task~PaymentResult~
-        +IssueRefund(transactionId string) Task~RefundResult~
+        +CreateProduct()* IProduct
+        +DoWork(request) Result
     }
-    class StripeProcessorFactory {
-        -_config StripeConfig
-        +CreateProcessor() IPaymentProcessor
+    class ConcreteCreatorA {
+        +CreateProduct() IProduct
     }
-    class PayPalProcessorFactory {
-        -_config PayPalConfig
-        +CreateProcessor() IPaymentProcessor
+    class ConcreteCreatorB {
+        +CreateProduct() IProduct
     }
-    class SquareProcessorFactory {
-        -_config SquareConfig
-        +CreateProcessor() IPaymentProcessor
-    }
-    class ApplePayProcessorFactory {
-        -_config ApplePayConfig
-        +CreateProcessor() IPaymentProcessor
-    }
-    class PaymentController {
-        -_factory PaymentProcessorFactory
-        +Charge(request PaymentRequest) Task~IActionResult~
+    class Client {
+        -_creator Creator
+        +Run(request) Result
     }
 
-    IPaymentProcessor <|.. StripePaymentProcessor : implements
-    IPaymentProcessor <|.. PayPalPaymentProcessor : implements
-    IPaymentProcessor <|.. SquarePaymentProcessor : implements
-    IPaymentProcessor <|.. ApplePayProcessor : implements
-    PaymentProcessorFactory <|-- StripeProcessorFactory : extends
-    PaymentProcessorFactory <|-- PayPalProcessorFactory : extends
-    PaymentProcessorFactory <|-- SquareProcessorFactory : extends
-    PaymentProcessorFactory <|-- ApplePayProcessorFactory : extends
-    StripeProcessorFactory ..> StripePaymentProcessor : creates
-    PayPalProcessorFactory ..> PayPalPaymentProcessor : creates
-    SquareProcessorFactory ..> SquarePaymentProcessor : creates
-    ApplePayProcessorFactory ..> ApplePayProcessor : creates
-    PaymentController --> PaymentProcessorFactory : uses
+    IProduct &lt;|.. ConcreteProductA : implements
+    IProduct &lt;|.. ConcreteProductB : implements
+    Creator &lt;|-- ConcreteCreatorA : extends
+    Creator &lt;|-- ConcreteCreatorB : extends
+    ConcreteCreatorA ..&gt; ConcreteProductA : creates
+    ConcreteCreatorB ..&gt; ConcreteProductB : creates
+    Client --&gt; Creator : uses
+    Creator ..&gt; IProduct : returns
     </div>
   </div>
 
-  <h3 class="sub" style="margin-top:2rem;">Sequence Diagram — Runtime Flow</h3>
+  <div class="callout callout-success" style="margin-top:1rem;margin-bottom:1.5rem;">
+    <div class="callout-title"><i class="fa-solid fa-arrow-right"></i> See This Diagram Come Alive</div>
+    <p style="color:var(--text-secondary);margin:0;">Section 6 implements this exact structure using a <strong>Payment Gateway</strong> domain — <code>IProduct</code> becomes <code>IPaymentProcessor</code>, <code>ConcreteProductA</code> becomes <code>StripePaymentProcessor</code>, and the Creator becomes <code>PaymentProcessorFactory</code> with 4 concrete providers.</p>
+  </div>
+
+  <h3 class="sub">Sequence Diagram — Runtime Flow</h3>
+  <p class="body-text">This is what actually happens at runtime, step by step. The Client never knows which ConcreteProduct is being used — it talks only to the Creator, who delegates creation to the subclass.</p>
   <div class="mermaid-container">
     <span class="diagram-hint"><i class="fa-solid fa-up-down-left-right"></i> Scroll &amp; pinch to zoom</span>
     <div class="mermaid">
 sequenceDiagram
-    participant C as PaymentController
-    participant F as StripeProcessorFactory
-    participant B as PaymentProcessorFactory (base)
-    participant P as StripePaymentProcessor
-    participant S as Stripe API
+    participant CL as Client
+    participant CC as ConcreteCreatorA
+    participant CR as Creator (base class)
+    participant CP as ConcreteProductA
 
-    C->>F: ProcessPayment(request)
-    Note over F,B: Calls base class template method
-    F->>B: base.ProcessPayment(request)
-    B->>F: CreateProcessor()
-    Note over F: Override returns concrete product
-    F-->>B: returns StripePaymentProcessor instance
-    B->>P: ValidateAsync(request)
-    P-->>B: true (validation passed)
-    B->>P: ProcessAsync(request)
-    P->>S: POST /v1/charges (Stripe SDK)
-    S-->>P: ChargeResponse (200 OK)
-    P-->>B: PaymentResult { Success, TransactionId }
-    B-->>C: PaymentResult { Success, TransactionId }
-    Note over C: Controller never touched StripePaymentProcessor directly
+    CL->>CC: DoWork(request)
+    Note over CC,CR: Inherited from base Creator
+    CC->>CR: base.DoWork(request)
+    CR->>CR: Validate(request)
+    CR->>CC: CreateProduct()
+    Note over CC: Override returns specific product
+    CC-->>CR: returns ConcreteProductA instance
+    CR->>CP: Execute(request)
+    CP-->>CR: Result { success }
+    CR-->>CL: Result { success }
+    Note over CL: Client never saw ConcreteProductA directly
     </div>
   </div>
 
   <div class="callout callout-info" style="margin-top:1.5rem;">
     <div class="callout-title"><i class="fa-solid fa-magnifying-glass"></i> Key Structural Observations</div>
-    <p style="color:var(--text-secondary);margin-bottom:0.75rem;"><strong>Two parallel hierarchies:</strong> Factory Method produces two mirrored class trees. The Creator hierarchy (<code>PaymentProcessorFactory</code> base, four concrete factory subclasses) exactly mirrors the Product hierarchy (<code>IPaymentProcessor</code> interface, four concrete processor implementations). Each pair is cohesive and travels together — add <code>KlarnaProcessorFactory</code>, you also add <code>KlarnaPaymentProcessor</code>.</p>
-    <p style="color:var(--text-secondary);margin-bottom:0.75rem;"><strong>Template Method connection:</strong> The abstract Creator's <code>ProcessPayment()</code> is a Template Method — it defines the algorithm skeleton (validate, then process, then log) while deferring the product creation step to <code>CreateProcessor()</code>. Factory Method is frequently implemented via Template Method at the Creator level. The two patterns are structurally coupled here.</p>
-    <p style="color:var(--text-secondary);"><strong>Where coupling lives:</strong> The <em>only</em> place that references <code>new StripePaymentProcessor()</code> is <code>StripeProcessorFactory.CreateProcessor()</code>. The Controller, the base factory, the interface — all are Stripe-free. This is intentional tight coupling at the factory level, freeing everything else. The coupling is contained, named, and obvious.</p>
+    <p style="color:var(--text-secondary);margin-bottom:0.75rem;"><strong>Two parallel hierarchies:</strong> Factory Method always produces two mirrored class trees. The Creator hierarchy (abstract Creator + concrete creator subclasses) exactly mirrors the Product hierarchy (Product interface + concrete product implementations). Each pair is cohesive and travels together — add a new ConcreteCreator, you also add its matching ConcreteProduct. They come in pairs, always.</p>
+    <p style="color:var(--text-secondary);margin-bottom:0.75rem;"><strong>Template Method connection:</strong> The Creator's <code>DoWork()</code> is a Template Method — it defines the algorithm skeleton (validate → create → execute → log) while deferring the creation step to <code>CreateProduct()</code>. The GoF book literally says: <em>"Factory Method is often called from within template methods."</em> Factory Method is a creational pattern, Template Method is a behavioral pattern — same mechanism, different intent.</p>
+    <p style="color:var(--text-secondary);"><strong>Where coupling lives:</strong> The <em>only</em> class that ever writes <code>new ConcreteProductA()</code> is <code>ConcreteCreatorA</code>. The Client, the base Creator, the Product interface — all are completely free of any concrete product references. This is intentional: tight coupling is contained in exactly one place (the concrete creator), freeing everything else to be generic and reusable.</p>
   </div>
 </section>
 
@@ -1178,7 +1149,7 @@ public record PaymentResult(
 
   <!-- Card 3: StripePaymentProcessor -->
   <div class="card open">
-    <div class="card-title"><i class="fa-solid fa-stripe-s" style="color:#635bff"></i> Concrete Product: StripePaymentProcessor</div>
+    <div class="card-title"><i class="fa-brands fa-stripe-s" style="color:#635bff"></i> Concrete Product: StripePaymentProcessor</div>
     <div class="card-body">
       <p class="body-text">The <strong>Concrete Product</strong> for Stripe. Key characteristics: uses Stripe.net SDK (<code>PaymentIntentService</code>), handles 3D Secure via <code>RequiresAction</code> status, uses idempotency keys to prevent duplicate charges, and includes a Polly retry policy for transient network failures.</p>
 
@@ -1239,7 +1210,7 @@ public record PaymentResult(
             {
                 var intent = await _intentService.CreateAsync(
                     options, requestOptions, ct);
-                return MapToPaymentResult(intent, request.TransactionId);
+                return MapToPaymentResult(intent, request.IdempotencyKey);
             }
             catch (StripeException ex) when
                 (ex.StripeError?.Type == "card_error")
@@ -1442,6 +1413,7 @@ public record PaymentResult(
 public abstract class PaymentProcessorFactory
 {
     private readonly ILogger _logger;
+    protected ILogger Logger =&gt; _logger; // Expose to subclasses for logging
 
     protected PaymentProcessorFactory(ILogger logger)
         =&gt; _logger = logger;
@@ -1665,9 +1637,15 @@ public sealed class CheckoutService
       </div>
 
       <h3 class="sub">The Bug — Wrong Config Injected at Registration</h3>
-      <div class="macos-window">
-        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Program.cs — BROKEN: Generic Config, Wrong Injection</span></div>
-        <div class="macos-body"><pre><code class="language-csharp">// WRONG: Both factories receive IOptions&lt;ApiConfiguration&gt;
+      <div class="tab-container">
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="bug1-broken-program">Program.cs — BROKEN</button>
+          <button class="tab-btn" data-tab="bug1-broken-factory">PayPalProcessorFactory.cs — Root Cause</button>
+        </div>
+        <div class="tab-panel active" data-panel="bug1-broken-program">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Program.cs — BROKEN: Generic Config, Wrong Injection</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// WRONG: Both factories receive IOptions&lt;ApiConfiguration&gt;
 // DI has no way to know WHICH provider's config goes WHERE.
 // The developer registered them in the wrong order by mistake.
 
@@ -1684,6 +1662,45 @@ builder.Services.AddKeyedSingleton&lt;PaymentProcessorFactory,
 
 // No test caught this because integration tests mocked the processors,
 // never exercising real API key routing.</code></pre></div>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="bug1-broken-factory">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PayPalProcessorFactory.cs — WHY This Bug Compiles</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// ROOT CAUSE: The factory constructor accepts a GENERIC config type.
+// DI has only ONE registered IOptions&lt;ApiConfiguration&gt; — Stripe's.
+// PayPal's factory silently gets Stripe's API key because the type matches.
+
+public sealed class PayPalProcessorFactory : PaymentProcessorFactory
+{
+    private readonly IOptions&lt;ApiConfiguration&gt; _config;  // ← GENERIC type!
+    //               ^^^^^^^^^^^^^^^^^^^^^^^^
+    //  Same type as StripeProcessorFactory — DI can't distinguish them.
+
+    public PayPalProcessorFactory(
+        IOptions&lt;ApiConfiguration&gt; config,   // ← DI injects Stripe's config here
+        ILogger&lt;PayPalProcessorFactory&gt; logger) : base(logger)
+        =&gt; _config = config;
+
+    protected override IPaymentProcessor CreateProcessor()
+    {
+        // _config.Value contains Stripe's SecretKey, not PayPal's ClientId!
+        // PayPal API calls succeed but charge to Stripe's merchant account.
+        return new PayPalPaymentProcessor(
+            new HttpClient(), _config, Logger);
+    }
+}
+
+// Compare with StripeProcessorFactory — SAME constructor signature:
+public sealed class StripeProcessorFactory : PaymentProcessorFactory
+{
+    private readonly IOptions&lt;ApiConfiguration&gt; _config;  // ← SAME generic type
+    public StripeProcessorFactory(
+        IOptions&lt;ApiConfiguration&gt; config, ...) : base(logger)
+        =&gt; _config = config;
+}</code></pre></div>
+          </div>
+        </div>
       </div>
 
       <div class="callout callout-success">
@@ -1691,9 +1708,15 @@ builder.Services.AddKeyedSingleton&lt;PaymentProcessorFactory,
         The fix eliminates the ambiguity completely by making each provider's config a unique type. The DI container can now never inject the wrong config because the types are incompatible.
       </div>
 
-      <div class="macos-window">
-        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Program.cs — FIXED: Unique Config Types Per Provider</span></div>
-        <div class="macos-body"><pre><code class="language-csharp">// Each provider has its own sealed config record — types are incompatible.
+      <div class="tab-container">
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="bug1-fix-program">Program.cs — FIXED</button>
+          <button class="tab-btn" data-tab="bug1-fix-factory">PayPalProcessorFactory.cs — FIXED</button>
+        </div>
+        <div class="tab-panel active" data-panel="bug1-fix-program">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Program.cs — FIXED: Unique Config Types Per Provider</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// Each provider has its own sealed config record — types are incompatible.
 // DI cannot accidentally inject StripeConfiguration into PayPalProcessorFactory.
 
 public sealed record StripeConfiguration
@@ -1721,12 +1744,40 @@ builder.Services
     .AddOptions&lt;PayPalConfiguration&gt;()
     .BindConfiguration("Payment:PayPal")
     .ValidateDataAnnotations()
-    .ValidateOnStart();
+    .ValidateOnStart();</code></pre></div>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="bug1-fix-factory">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PayPalProcessorFactory.cs — FIXED: Type-Safe Config</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// FIXED: Constructor now accepts IOptions&lt;PayPalConfiguration&gt; — a UNIQUE type.
+// If you accidentally inject IOptions&lt;StripeConfiguration&gt;, the compiler
+// catches it immediately. DI can never mis-wire configs again.
 
-// Constructors now use the specific type — compiler enforces correctness:
-// StripeProcessorFactory(IOptions&lt;StripeConfiguration&gt; config, ...)
-// PayPalProcessorFactory(IOptions&lt;PayPalConfiguration&gt; config, ...)
-// Injecting StripeConfiguration into PayPalProcessorFactory = compile error.</code></pre></div>
+public sealed class PayPalProcessorFactory : PaymentProcessorFactory
+{
+    private readonly IOptions&lt;PayPalConfiguration&gt; _config;  // ← SPECIFIC type!
+    //               ^^^^^^^^^^^^^^^^^^^^^^^^^^
+    //  Incompatible with IOptions&lt;StripeConfiguration&gt; — compiler error if swapped.
+
+    public PayPalProcessorFactory(
+        IOptions&lt;PayPalConfiguration&gt; config,   // ← Only PayPal config fits here
+        ILogger&lt;PayPalProcessorFactory&gt; logger) : base(logger)
+        =&gt; _config = config;
+
+    protected override IPaymentProcessor CreateProcessor()
+    {
+        // _config.Value is GUARANTEED to be PayPalConfiguration.
+        // Contains ClientId, ClientSecret, BaseUrl — all PayPal-specific.
+        return new PayPalPaymentProcessor(
+            new HttpClient(), _config, Logger);
+    }
+}
+
+// StripeProcessorFactory uses IOptions&lt;StripeConfiguration&gt; — different type.
+// The two can NEVER be confused by the DI container.</code></pre></div>
+          </div>
+        </div>
       </div>
 
       <h3 class="sub">Timeline of Failure</h3>
@@ -1755,17 +1806,104 @@ builder.Services
       </div>
 
       <h3 class="sub">The Bug — DI Registration Omitted</h3>
-      <div class="macos-window">
-        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Program.cs — BROKEN: ApplePay Factory Never Registered</span></div>
-        <div class="macos-body"><pre><code class="language-csharp">// Developer added the new class files but forgot this line:
+      <div class="tab-container">
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="bug2-broken-program">Program.cs — MISSING LINE</button>
+          <button class="tab-btn" data-tab="bug2-processor">ApplePayPaymentProcessor.cs</button>
+          <button class="tab-btn" data-tab="bug2-factory">ApplePayProcessorFactory.cs</button>
+        </div>
+        <div class="tab-panel active" data-panel="bug2-broken-program">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Program.cs — BROKEN: ApplePay Factory Never Registered</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// Developer added the new class files (see other tabs) but forgot this line:
 builder.Services.AddKeyedSingleton&lt;PaymentProcessorFactory,
     ApplePayProcessorFactory&gt;(PaymentProvider.ApplePay);
 // ↑ This line is MISSING from Program.cs
+
+// The other three providers ARE registered:
+builder.Services.AddKeyedSingleton&lt;PaymentProcessorFactory,
+    StripeProcessorFactory&gt;(PaymentProvider.Stripe);       // ✓
+builder.Services.AddKeyedSingleton&lt;PaymentProcessorFactory,
+    PayPalProcessorFactory&gt;(PaymentProvider.PayPal);       // ✓
+builder.Services.AddKeyedSingleton&lt;PaymentProcessorFactory,
+    SquareProcessorFactory&gt;(PaymentProvider.Square);       // ✓
+// ApplePay?  ← NOWHERE. Developer forgot.
 
 // Result at runtime when ApplePay is selected:
 // _sp.GetKeyedService&lt;PaymentProcessorFactory&gt;(PaymentProvider.ApplePay)
 // returns null → resolver throws InvalidOperationException
 // → HTTP 500 → "Payment failed" in UI</code></pre></div>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="bug2-processor">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ApplePayPaymentProcessor.cs — Created Correctly</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// ✓ The developer DID create this file — the processor itself is correct.
+// Apple Pay uses a merchant session token + payment token from the device.
+
+public sealed class ApplePayPaymentProcessor : IPaymentProcessor
+{
+    private readonly HttpClient _http;
+    private readonly IOptions&lt;ApplePayConfiguration&gt; _config;
+    private readonly ILogger&lt;ApplePayPaymentProcessor&gt; _logger;
+
+    public string          ProviderName =&gt; "ApplePay";
+    public PaymentProvider Provider     =&gt; PaymentProvider.ApplePay;
+
+    public ApplePayPaymentProcessor(
+        HttpClient http,
+        IOptions&lt;ApplePayConfiguration&gt; config,
+        ILogger&lt;ApplePayPaymentProcessor&gt; logger)
+    {
+        _http   = http;
+        _config = config;
+        _logger = logger;
+    }
+
+    public async Task&lt;PaymentResult&gt; ChargeAsync(
+        PaymentRequest request, CancellationToken ct = default)
+    {
+        // 1. Validate merchant session with Apple's servers
+        // 2. Decrypt the payment token from the device
+        // 3. Process through Apple Pay payment network
+        // ... (full implementation omitted for brevity)
+        return new PaymentResult( /* ... */ );
+    }
+
+    // ... RefundAsync, GetTransactionStatusAsync, etc.
+}</code></pre></div>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="bug2-factory">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ApplePayProcessorFactory.cs — Created Correctly</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// ✓ The developer DID create this file — the factory is correct.
+// It follows the exact same pattern as Stripe/PayPal/Square factories.
+
+public sealed class ApplePayProcessorFactory : PaymentProcessorFactory
+{
+    private readonly ApplePayPaymentProcessor _processor;
+
+    public ApplePayProcessorFactory(
+        ApplePayPaymentProcessor processor,
+        ILogger&lt;ApplePayProcessorFactory&gt; logger)
+        : base(logger) =&gt; _processor = processor;
+
+    protected override IPaymentProcessor CreateProcessor()
+        =&gt; _processor;
+}
+
+// The developer completed Steps 1-3 perfectly:
+//   1. ✓ Added ApplePay = 4 to PaymentProvider enum
+//   2. ✓ Created ApplePayPaymentProcessor : IPaymentProcessor
+//   3. ✓ Created ApplePayProcessorFactory : PaymentProcessorFactory
+//
+// But forgot Step 4:
+//   4. ✗ Register in Program.cs with AddKeyedSingleton
+//
+// Without Step 4, the DI container doesn't know this factory exists.</code></pre></div>
+          </div>
+        </div>
       </div>
 
       <div class="callout callout-success">
@@ -1869,9 +2007,15 @@ builder.Services.AddHostedService&lt;PaymentFactoryStartupValidator&gt;();</code
       </div>
 
       <h3 class="sub">The Bug — new HttpClient() Per Processor Instance</h3>
-      <div class="macos-window">
-        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PayPalProcessorFactory.cs — BROKEN: new HttpClient() Per Call</span></div>
-        <div class="macos-body"><pre><code class="language-csharp">// WRONG: Each CreateProcessor() call creates a new processor
+      <div class="tab-container">
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="bug3-broken-factory">PayPalProcessorFactory.cs — BROKEN</button>
+          <button class="tab-btn" data-tab="bug3-broken-processor">PayPalPaymentProcessor.cs — Constructor</button>
+        </div>
+        <div class="tab-panel active" data-panel="bug3-broken-factory">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PayPalProcessorFactory.cs — BROKEN: new HttpClient() Per Call</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// WRONG: Each CreateProcessor() call creates a new processor
 // with a brand-new HttpClient — NOT reused between requests.
 public sealed class PayPalProcessorFactory : PaymentProcessorFactory
 {
@@ -1891,6 +2035,42 @@ public sealed class PayPalProcessorFactory : PaymentProcessorFactory
             http, _config, Logger);
     }
 }</code></pre></div>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="bug3-broken-processor">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PayPalPaymentProcessor.cs — Receives the HttpClient</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// The processor itself is NOT the problem — it simply uses whatever
+// HttpClient it receives. The bug is in WHO creates that HttpClient.
+
+public sealed class PayPalPaymentProcessor : IPaymentProcessor
+{
+    private readonly HttpClient _http;  // ← Whatever the factory passes in
+    private readonly ILogger&lt;PayPalPaymentProcessor&gt; _logger;
+    private readonly string _clientId;
+    private readonly string _clientSecret;
+    private readonly string _baseUrl;
+
+    public PayPalPaymentProcessor(
+        HttpClient http,               // ← Injected by the FACTORY
+        IOptions&lt;PayPalConfiguration&gt; config,
+        ILogger&lt;PayPalPaymentProcessor&gt; logger)
+    {
+        _http         = http;           // Stored — used for ALL API calls
+        _clientId     = config.Value.ClientId;
+        _clientSecret = config.Value.ClientSecret;
+        _baseUrl      = config.Value.BaseUrl;
+        _logger       = logger;
+    }
+
+    // Every method (ChargeAsync, RefundAsync, etc.) calls _http.PostAsync(...)
+    // If _http is a fresh instance each time, each instance opens NEW TCP sockets.
+    // At 2,000 req/s × new HttpClient each = 2,000 new TCP connections/second.
+    // OS ephemeral port range (49152–65535) = ~16,383 ports.
+    // TIME_WAIT holds each for 4 minutes → ports exhausted in ~8 seconds.
+}</code></pre></div>
+          </div>
+        </div>
       </div>
 
       <div class="callout callout-success">
@@ -1898,9 +2078,15 @@ public sealed class PayPalProcessorFactory : PaymentProcessorFactory
         <code>IHttpClientFactory</code> (from <code>Microsoft.Extensions.Http</code>) pools <code>HttpMessageHandler</code> instances. All <code>HttpClient</code> objects created by the factory share the same underlying connection pool. Ports are reused. DNS changes are respected via handler rotation. The fix requires zero changes to the processor itself — only the factory and DI registration change.
       </div>
 
-      <div class="macos-window">
-        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PayPalProcessorFactory.cs — FIXED: IHttpClientFactory</span></div>
-        <div class="macos-body"><pre><code class="language-csharp">// CORRECT: IHttpClientFactory manages connection pooling.
+      <div class="tab-container">
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="bug3-fix-factory">PayPalProcessorFactory.cs — FIXED</button>
+          <button class="tab-btn" data-tab="bug3-fix-program">Program.cs — HttpClient Registration</button>
+        </div>
+        <div class="tab-panel active" data-panel="bug3-fix-factory">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PayPalProcessorFactory.cs — FIXED: IHttpClientFactory</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// CORRECT: IHttpClientFactory manages connection pooling.
 // CreateClient() reuses an existing HttpMessageHandler from the pool.
 // Ephemeral port exhaustion is impossible.
 
@@ -1930,17 +2116,36 @@ public sealed class PayPalProcessorFactory : PaymentProcessorFactory
         return new PayPalPaymentProcessor(
             http, _config, _processorLogger);
     }
-}
+}</code></pre></div>
+          </div>
+        </div>
+        <div class="tab-panel" data-panel="bug3-fix-program">
+          <div class="macos-window">
+            <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Program.cs — Named HttpClient Registration</span></div>
+            <div class="macos-body"><pre><code class="language-csharp">// Register a NAMED HttpClient for PayPal.
+// IHttpClientFactory.CreateClient("paypal") returns an HttpClient
+// backed by a SHARED HttpMessageHandler pool.
+//
+// How connection pooling works:
+// 1. HttpMessageHandler is created ONCE and reused across all HttpClient instances
+// 2. TCP connections are pooled — no new socket per request
+// 3. Handler is rotated every 2 minutes (default) to respect DNS changes
+// 4. Old handlers are disposed after all in-flight requests complete
 
-// Program.cs — name the client for per-provider policy config:
 builder.Services.AddHttpClient("paypal", client =&gt;
 {
     client.BaseAddress = new Uri(
         builder.Configuration["Payment:PayPal:BaseUrl"]!);
     client.Timeout = TimeSpan.FromSeconds(30);
 })
-.AddPolicyHandler(GetRetryPolicy())     // Polly retry
-.AddPolicyHandler(GetCircuitBreaker()); // Polly circuit breaker</code></pre></div>
+.AddPolicyHandler(GetRetryPolicy())      // Polly: retry transient failures
+.AddPolicyHandler(GetCircuitBreaker());  // Polly: break on repeated failures
+
+// At 2,000 req/s, ALL requests share the same handler pool.
+// Instead of 2,000 TCP connections/second → ~5-10 pooled connections total.
+// Ephemeral port exhaustion is impossible.</code></pre></div>
+          </div>
+        </div>
       </div>
 
       <h3 class="sub">Why This Is a Factory Method Concern</h3>
@@ -2919,7 +3124,7 @@ public class StripeProcessor : IPaymentProcessor
 public void Dispose() =&gt; _cfg.OnChanged -= Reload;
 </code></pre></div>
       </div>
-      <div class="qa-great"><strong>What separates good from great:</strong> Mentioning <strong>weak event patterns</strong> shows advanced knowledge. A normal event subscription holds a "strong reference" — the event source keeps the subscriber alive. A weak reference is like holding a piece of string attached to a helium balloon — if nothing else holds the balloon, it flies away even though your string is still there. WeakEventManager (a WPF utility) implements this so processors can subscribe to events without staying alive just because of the subscription. Also mention the ownership question: if the factory creates objects that implement <code>IDisposable</code> (an interface that signals "this object needs cleanup when you're done"), document clearly in the API whether the factory or the caller is responsible for calling <code>Dispose()</code>. Great candidates also mention adding a guard in <code>Dispose()</code> so calling it twice doesn't throw an exception — a simple <code>if (_disposed) return;</code> check.</div>
+      <div class="qa-great"><strong>What separates good from great:</strong> Mentioning <strong>weak event patterns</strong> shows advanced knowledge. A normal event subscription holds a "strong reference" — the event source keeps the subscriber alive. A weak reference is like holding a piece of string attached to a helium balloon — if nothing else holds the balloon, it flies away even though your string is still there. WeakEventManager (a WPF-specific utility — for non-WPF apps, use <code>WeakReference&lt;T&gt;</code> with manual weak event patterns) implements this so processors can subscribe to events without staying alive just because of the subscription. Also mention the ownership question: if the factory creates objects that implement <code>IDisposable</code> (an interface that signals "this object needs cleanup when you're done"), document clearly in the API whether the factory or the caller is responsible for calling <code>Dispose()</code>. Great candidates also mention adding a guard in <code>Dispose()</code> so calling it twice doesn't throw an exception — a simple <code>if (_disposed) return;</code> check.</div>
     </div></div>
   </div>
 
@@ -2953,7 +3158,7 @@ services.AddKeyedTransient&lt;IPaymentProcessor, StripeProcessorV1&gt;("stripe_v
 services.AddKeyedTransient&lt;IPaymentProcessor, StripeProcessorV2&gt;("stripe_v2");
 </code></pre></div>
       </div>
-      <div class="qa-great"><strong>What separates good from great:</strong> The Adapter pattern angle is underappreciated in interviews. When <code>StripeProcessorV2</code> has a completely different method signature that doesn't match <code>IPaymentProcessor</code>, you create a <code>StripeV2Adapter</code> class that implements <code>IPaymentProcessor</code> but internally uses the new <code>StripeProcessorV2</code>. The adapter is a translator — it speaks "old interface" on the outside and "new API" on the inside. The factory returns the adapter; every caller continues working unchanged. This is actually the <strong>Strangler Fig pattern</strong> (named after a vine that grows around a tree and gradually replaces it) applied at the class level. Great candidates also emphasize that the interface is the most important thing to protect — it's the contract that ALL parties (all callers, all providers) must honour, and changing it later becomes exponentially harder as more code builds against it.</div>
+      <div class="qa-great"><strong>What separates good from great:</strong> The Adapter pattern angle is underappreciated in interviews. When <code>StripeProcessorV2</code> has a completely different method signature that doesn't match <code>IPaymentProcessor</code>, you create a <code>StripeV2Adapter</code> class that implements <code>IPaymentProcessor</code> but internally uses the new <code>StripeProcessorV2</code>. The adapter is a translator — it speaks "old interface" on the outside and "new API" on the inside. The factory returns the adapter; every caller continues working unchanged. This is actually the <strong>Strangler Fig pattern</strong> (named after a vine that grows around a tree and gradually replaces it — see Q21 for a full implementation) applied at the class level. Great candidates also emphasize that the interface is the most important thing to protect — it's the contract that ALL parties (all callers, all providers) must honour, and changing it later becomes exponentially harder as more code builds against it.</div>
     </div></div>
   </div>
 
@@ -2971,13 +3176,17 @@ services.AddKeyedTransient&lt;IPaymentProcessor, StripeProcessorV2&gt;("stripe_v
         <strong>How to think about it:</strong> <strong>A/B testing</strong> in a factory is a routing problem with one critical requirement: the same user must always go to the same provider. If you randomly pick a provider on every request, the same user might pay with Stripe for their first purchase and PayPal for their second — different UX, different receipts, potentially breaking refunds (you'd need to refund on the right provider). Consistency is everything.<br><br>
         The solution: <strong>deterministic hashing</strong>. Take the user's ID (a stable, permanent identifier — NOT a session ID, those expire), put it through a hash function, and take it modulo 100. The result is a bucket number from 0-99. Users in buckets 0-49 always get Provider A. Users in buckets 50-99 always get Provider B. Same user ID always produces the same bucket number, so the same user always gets the same provider.
       </div>
-      <p class="body-text">The factory needs the current user's stable identifier (user ID or account ID — NOT session ID, because sessions expire and create a different ID each time). Use a deterministic hash: <code>Math.Abs(userId.GetHashCode()) % 100</code> gives a stable number from 0-99. Map that number to a provider based on your A/B split configuration (first 50 buckets → Stripe, last 50 → PayPal). This guarantees every request from the same user hits the same provider — enabling meaningful A/B analysis AND preventing confusing situations like charging on Stripe but then trying to refund on PayPal (which would fail since the original charge isn't there).</p>
+      <p class="body-text">The factory needs the current user's stable identifier (user ID or account ID — NOT session ID, because sessions expire and create a different ID each time). Use a deterministic hash derived from the Guid's bytes: <code>Math.Abs(BitConverter.ToInt32(userId.ToByteArray(), 0)) % 100</code> gives a stable number from 0-99. <strong>Important:</strong> do NOT use <code>Guid.GetHashCode()</code> — it is not guaranteed stable across .NET versions or process restarts (it may use randomized hashing). <code>BitConverter.ToInt32</code> on the raw bytes is deterministic forever. Map that number to a provider based on your A/B split configuration (first 50 buckets → Stripe, last 50 → PayPal). This guarantees every request from the same user hits the same provider — enabling meaningful A/B analysis AND preventing confusing situations like charging on Stripe but then trying to refund on PayPal (which would fail since the original charge isn't there).</p>
       <p class="body-text">Save the user's assigned bucket to the database on their first request. Why? Because if you later change the hash function or adjust the bucket boundaries (e.g., shifting from 50/50 to 70/30), users who were already in the experiment would suddenly switch groups — contaminating your data and making the results meaningless. By persisting the assignment, users already enrolled stay in their original group no matter what changes you make to the algorithm. Also emit telemetry (structured log or metric event) with the bucket number and provider name on every transaction so your data team can analyze the A/B results.</p>
       <div class="macos-window">
         <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ABTestingFactory.cs</span></div>
         <div class="macos-body"><pre><code class="language-csharp">public IPaymentProcessor Create(Guid userId)
 {
-    var bucket = Math.Abs(userId.GetHashCode()) % 100;
+    // Use BitConverter on Guid bytes — stable across .NET versions.
+    // DO NOT use Guid.GetHashCode() — it may use randomized hashing
+    // and return different values across process restarts or .NET upgrades.
+    var bytes  = userId.ToByteArray();
+    var bucket = Math.Abs(BitConverter.ToInt32(bytes, 0)) % 100;
     var provider = bucket &lt; 50 ? "stripe" : "paypal"; // 50/50 split
     _telemetry.TrackEvent("ProviderSelected",
         new { userId, bucket, provider });
@@ -2985,7 +3194,7 @@ services.AddKeyedTransient&lt;IPaymentProcessor, StripeProcessorV2&gt;("stripe_v
 }
 </code></pre></div>
       </div>
-      <div class="qa-great"><strong>What separates good from great:</strong> The persistent assignment detail is critical for valid A/B test results. If a user can switch groups mid-experiment, the groups are contaminated — you can't tell if your results are real or just noise from users switching. Storing the assignment in the database makes the experiment results trustworthy. Also mention the <strong>holdout group</strong>: set aside 5% of users who receive NEITHER variant — they just get the old existing behaviour. This holdout group lets you measure the baseline over time and control for seasonal effects (e.g., people naturally spend more in December — without a holdout, you might incorrectly attribute that to your new provider being better).</div>
+      <div class="qa-great"><strong>What separates good from great:</strong> For per-request random assignment (not sticky per user), see Q21's Strangler Fig pattern. The persistent assignment detail here is critical for valid A/B test results. If a user can switch groups mid-experiment, the groups are contaminated — you can't tell if your results are real or just noise from users switching. Storing the assignment in the database makes the experiment results trustworthy. Also mention the <strong>holdout group</strong>: set aside 5% of users who receive NEITHER variant — they just get the old existing behaviour. This holdout group lets you measure the baseline over time and control for seasonal effects (e.g., people naturally spend more in December — without a holdout, you might incorrectly attribute that to your new provider being better).</div>
     </div></div>
   </div>
 
@@ -3048,9 +3257,11 @@ services.AddKeyedTransient&lt;IPaymentProcessor, StripeProcessorV2&gt;("stripe_v
         var ctx = new PluginLoadContext(dll); // isolated AssemblyLoadContext
         var asm = ctx.LoadFromAssemblyPath(dll);
         var pluginType = asm.GetTypes()
-            .FirstOrDefault(t =&gt; typeof(IPaymentPlugin).IsAssignableFrom(t));
+            .FirstOrDefault(t =&gt; typeof(IPaymentProcessorPlugin).IsAssignableFrom(t));
         if (pluginType is null) continue;
-        var plugin = (IPaymentPlugin)Activator.CreateInstance(pluginType)!;
+        // Activator.CreateInstance requires a PUBLIC PARAMETERLESS constructor.
+        // Plugin classes must have one, or this throws MissingMethodException.
+        var plugin = (IPaymentProcessorPlugin)Activator.CreateInstance(pluginType)!;
         plugin.Register(services); // plugin registers its own processors
     }
 }
@@ -3116,12 +3327,27 @@ public interface IPaymentProcessorFactory
         <div class="macos-body"><pre><code class="language-csharp">public class PoolingPaymentFactory : IPaymentProcessorFactory
 {
     private readonly ConcurrentDictionary&lt;string, ObjectPool&lt;IPaymentProcessor&gt;&gt; _pools = new();
+    private readonly ObjectPoolProvider _poolProvider;
+    private readonly IServiceProvider _sp;
+
+    public PoolingPaymentFactory(ObjectPoolProvider poolProvider, IServiceProvider sp)
+    {
+        _poolProvider = poolProvider;
+        _sp = sp;
+    }
 
     public ProcessorLease Rent(string provider)
     {
         var pool = _pools.GetOrAdd(provider, key =&gt; CreatePool(key));
         var processor = pool.Get();
         return new ProcessorLease(processor, () =&gt; pool.Return(processor));
+    }
+
+    private ObjectPool&lt;IPaymentProcessor&gt; CreatePool(string provider)
+    {
+        // ObjectPoolProvider uses a PooledObjectPolicy to know how to create
+        // and reset processors. MaximumRetained defaults to Environment.ProcessorCount * 2.
+        return _poolProvider.Create(new ProcessorPoolPolicy(provider, _sp));
     }
 }
 
@@ -3195,13 +3421,13 @@ public sealed class ProcessorLease(IPaymentProcessor p, Action returnFn) : IAsyn
 {
     // Feature flag controls migration progress: 0 to 100 over weeks
     var newPct  = _flags.GetInt("new_processor_traffic_pct", defaultValue: 0);
-    var bucket  = Math.Abs(Guid.NewGuid().GetHashCode()) % 100;
+    var bucket  = Random.Shared.Next(100); // 0-99, no sticky assignment needed
     var useNew  = bucket &lt; newPct;
     return _sp.GetRequiredKeyedService&lt;IPaymentProcessor&gt;(useNew ? "new" : "legacy");
 }
 </code></pre></div>
       </div>
-      <div class="qa-great"><strong>What separates good from great:</strong> The <strong>dual-write / shadow mode</strong> enhancement is the senior-level insight. During migration, route every request to BOTH the old and new processor simultaneously. But only return the legacy result to the customer — the new processor's result is compared in the background and any differences are logged. You discover bugs in the new implementation before any real customer sees them. Only start increasing the traffic percentage after the discrepancy rate (how often new and old give different results) has been at zero for long enough to be confident. This technique — running the new system in shadow alongside the old — is exactly how Google and Netflix perform large backend migrations. Zero user impact, complete confidence before switching.</div>
+      <div class="qa-great"><strong>What separates good from great:</strong> For sticky per-user assignment (A/B testing where the same user always gets the same provider), see Q15's deterministic hashing approach. The <strong>dual-write / shadow mode</strong> enhancement is the senior-level insight. During migration, route every request to BOTH the old and new processor simultaneously. But only return the legacy result to the customer — the new processor's result is compared in the background and any differences are logged. You discover bugs in the new implementation before any real customer sees them. Only start increasing the traffic percentage after the discrepancy rate (how often new and old give different results) has been at zero for long enough to be confident. This technique — running the new system in shadow alongside the old — is exactly how Google and Netflix perform large backend migrations. Zero user impact, complete confidence before switching.</div>
     </div></div>
   </div>
 
@@ -3235,6 +3461,27 @@ public sealed class ProcessorLease(IPaymentProcessor p, Action returnFn) : IAsyn
 
     return _registry[key]();
 }
+
+// Exception hierarchy — callers catch at the right level:
+public abstract class PaymentFactoryException : Exception
+{
+    protected PaymentFactoryException(string message) : base(message) { }
+    protected PaymentFactoryException(string message, Exception inner) : base(message, inner) { }
+}
+
+public sealed class PaymentProviderNotFoundException : PaymentFactoryException
+{
+    public PaymentProviderNotFoundException(string message) : base(message) { }
+}
+
+public sealed class PaymentProviderUnavailableException : PaymentFactoryException
+{
+    public string ProviderKey { get; }
+    public DateTimeOffset? RetryAfter { get; init; } // When circuit breaker will probe
+    public PaymentProviderUnavailableException(string providerKey)
+        : base($"Provider '{providerKey}' is temporarily unavailable (circuit open).")
+        =&gt; ProviderKey = providerKey;
+}
 </code></pre></div>
       </div>
       <div class="qa-great"><strong>What separates good from great:</strong> The <code>RetryAfter</code> property in the exception is the senior-level detail. <code>PaymentProviderUnavailableException</code> should include the timestamp of when the circuit breaker will attempt to recover (the "half-open" state probe). The calling middleware reads this property and sets a <code>Retry-After</code> HTTP response header in the HTTP 503 response — giving clients a concrete time when they should try again. Without this, clients immediately retry on every 503, hammering the already-struggling server and making recovery slower. With this, clients wait the right amount of time. This follows <strong>RFC 7231</strong> (the standard that defines how HTTP status codes should work) and shows that you think about the full picture — from how exceptions are designed, all the way to what the client receives over the network.</div>
@@ -3259,17 +3506,25 @@ public sealed class ProcessorLease(IPaymentProcessor p, Action returnFn) : IAsyn
       <p class="body-text">As a safety net on top of auto-registration, write an <strong>integration test</strong> (a test that starts the real app, not fakes) that: (1) boots the real <code>WebApplication</code>, (2) reads the list of expected provider keys from configuration, and (3) tries to resolve each one from the DI container. If any key is missing, the test fails with a clear message like "Provider 'square' not registered." This test runs on every pull request in your CI pipeline, meaning a developer cannot merge a PR that would cause a missing registration in production.</p>
       <div class="macos-window">
         <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">RegistrationTest.cs</span></div>
-        <div class="macos-body"><pre><code class="language-csharp">[Fact]
+        <div class="macos-body"><pre><code class="language-csharp">// Use WebApplicationFactory&lt;Program&gt; — it builds the REAL app with all
+// DI registrations from Program.cs. WebApplication.CreateBuilder().Build()
+// would create an EMPTY host with no services registered.
+
+[Fact]
 public void AllConfiguredProviders_AreRegisteredInDI()
 {
-    var app = WebApplication.CreateBuilder().Build();
-    var expectedKeys = app.Configuration
+    var factory = new WebApplicationFactory&lt;Program&gt;();
+    var app     = factory.Services;  // Real DI container from Program.cs
+
+    var expectedKeys = factory.Services
+        .GetRequiredService&lt;IConfiguration&gt;()
         .GetSection("SupportedPaymentProviders")
         .Get&lt;string[]&gt;() ?? [];
 
     foreach (var key in expectedKeys)
     {
-        var processor = app.Services.GetKeyedService&lt;IPaymentProcessor&gt;(key);
+        var sp = factory.Services.GetRequiredService&lt;IKeyedServiceProvider&gt;();
+        var processor = sp.GetKeyedService&lt;IPaymentProcessor&gt;(key);
         Assert.NotNull(processor); // fails loudly with the missing key name
     }
 }
@@ -3297,15 +3552,24 @@ public void AllConfiguredProviders_AreRegisteredInDI()
       <p class="body-text"><strong>Blast radius containment</strong> (blast radius = how much damage a failure can cause) is critical: wrap each provider's registration in a try/catch. If Team A's processor throws an exception during startup, that provider gets marked as unhealthy and excluded from the registry. All other 24 providers continue working normally. Fire a structured alert immediately so Team A gets paged. No single team's bad code can take down all 25 providers.</p>
       <div class="macos-window">
         <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">PlatformFactory.cs — isolation envelope</span></div>
-        <div class="macos-body"><pre><code class="language-csharp">public PlatformPaymentFactory(IEnumerable&lt;IPaymentProcessorPlugin&gt; plugins)
+        <div class="macos-body"><pre><code class="language-csharp">public class PlatformPaymentFactory
 {
-    foreach (var plugin in plugins)
+    private readonly Dictionary&lt;string, IPaymentProcessorFactory&gt; _healthy = new();
+    private readonly Dictionary&lt;string, Exception&gt; _degraded = new();
+    private readonly IAlertService _alerts;
+
+    public PlatformPaymentFactory(
+        IEnumerable&lt;IPaymentProcessorPlugin&gt; plugins, IAlertService alerts)
     {
-        try { _healthy[plugin.Key] = plugin.CreateFactory(); }
-        catch (Exception ex)
+        _alerts = alerts;
+        foreach (var plugin in plugins)
         {
-            _degraded[plugin.Key] = ex;
-            _alerts.Send($"Provider '{plugin.Key}' failed to initialise: {ex.Message}");
+            try { _healthy[plugin.Key] = plugin.CreateFactory(); }
+            catch (Exception ex)
+            {
+                _degraded[plugin.Key] = ex;
+                _alerts.Send($"Provider '{plugin.Key}' failed to initialise: {ex.Message}");
+            }
         }
     }
 }
@@ -3345,6 +3609,18 @@ public class DistributedPaymentFactory(IServiceRegistry registry, IHttpClientFac
         return new HttpPaymentProcessorAdapter(client);          // same IPaymentProcessor interface
     }
 }
+
+// The adapter wraps HTTP calls behind the same IPaymentProcessor interface.
+// Callers have zero idea they're talking to a remote microservice.
+public sealed class HttpPaymentProcessorAdapter(HttpClient http) : IPaymentProcessor
+{
+    public async Task&lt;PaymentResult&gt; ChargeAsync(PaymentRequest req, CancellationToken ct)
+    {
+        var response = await http.PostAsJsonAsync("/charge", req, ct);
+        return await response.Content.ReadFromJsonAsync&lt;PaymentResult&gt;(ct)
+            ?? throw new InvalidOperationException("Empty response from remote service");
+    }
+}
 </code></pre></div>
       </div>
       <div class="qa-great"><strong>What separates good from great:</strong> The key insight is that the <code>IPaymentProcessor</code> interface is the <strong>durable abstraction</strong> — the one thing that doesn't change during the entire migration from monolith to microservices. The interface you defined in the monolith becomes the contract for the distributed system too. The caller code doesn't change a single line — it still calls <code>processor.Process(request)</code>. Only the implementation behind the interface changes from "in-memory C# object" to "HTTP call to a remote server." This is Factory Method at its most powerful: it insulates callers from the implementation mechanism (how the work is done), not just the implementation type (which class does the work). Great principal-level candidates frame this as: "We're migrating the transport layer, not the application model." That one sentence — migrating the transport, not the model — demonstrates architectural thinking that goes far beyond just knowing design patterns. It shows you understand that abstractions protect you from exactly this kind of change.</div>
@@ -3357,7 +3633,7 @@ public class DistributedPaymentFactory(IServiceRegistry registry, IHttpClientFac
 <section id="s15" class="section">
   <div class="section-header">
     <div class="section-icon green"><i class="fa-solid fa-compass-drafting"></i></div>
-    <div><div class="section-num">Section 15</div><h2 class="section-title">When to Use / Anti-Patterns</h2></div>
+    <div><div class="section-num">Section 15</div><h2 class="section-title">When To Use / When Not To Use</h2></div>
   </div>
 
   <div class="card open">
@@ -3408,7 +3684,7 @@ public class DistributedPaymentFactory(IServiceRegistry registry, IHttpClientFac
       <div class="grid-2">
         <div style="padding:1rem;border:1px solid rgba(239,68,68,0.25);border-radius:0.75rem;background:rgba(239,68,68,0.04);">
           <div style="font-weight:700;color:var(--accent-red);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;"><i class="fa-solid fa-ban"></i> Only one implementation</div>
-          <p style="font-size:0.9rem;color:var(--text-secondary);">If there is exactly one concrete type and no credible roadmap for a second, the factory adds four classes (interface, abstract creator, concrete creator, product) to model a variation that does not exist. Just use <code>new StripeProcessor()</code> or inject it directly via DI. Extract a factory later when the second implementation arrives.</p>
+          <p style="font-size:0.9rem;color:var(--text-secondary);">If there is exactly one concrete type and no credible roadmap for a second, the factory adds four classes (interface, abstract creator, concrete creator, product — though modern DI with keyed services can reduce this to just the product interface + concrete products) to model a variation that does not exist. Just use <code>new StripeProcessor()</code> or inject it directly via DI. Extract a factory later when the second implementation arrives.</p>
         </div>
         <div style="padding:1rem;border:1px solid rgba(239,68,68,0.25);border-radius:0.75rem;background:rgba(239,68,68,0.04);">
           <div style="font-weight:700;color:var(--accent-red);margin-bottom:0.5rem;display:flex;align-items:center;gap:0.5rem;"><i class="fa-solid fa-ban"></i> Two simple variants</div>
@@ -3443,10 +3719,10 @@ public class DistributedPaymentFactory(IServiceRegistry registry, IHttpClientFac
   </div>
 
   <div class="card open">
-    <div class="card-title"><i class="fa-solid fa-ruler-combined" style="color:var(--accent-green)"></i> The 2-Algorithm Rule — Your Quick Decision Heuristic</div>
+    <div class="card-title"><i class="fa-solid fa-ruler-combined" style="color:var(--accent-green)"></i> The Rule of Three — Your Quick Decision Heuristic</div>
     <div class="card-body">
       <div class="callout callout-success">
-        <div class="callout-title"><i class="fa-solid fa-lightbulb"></i> The 2-Algorithm Rule</div>
+        <div class="callout-title"><i class="fa-solid fa-lightbulb"></i> The Rule of Three</div>
         <p style="color:var(--text-secondary);font-size:0.95rem;margin-bottom:0.75rem;">This heuristic comes from the principle of not over-generalising until you have multiple concrete examples. Applied to Factory Method:</p>
         <ul class="styled green" style="margin-top:0.5rem;">
           <li><strong>1 variant</strong> — No factory needed. Use <code>new</code> directly or a simple DI registration. Adding factory infrastructure for one implementation is pure overhead with zero benefit.</li>
@@ -3583,7 +3859,7 @@ await processor.ProcessAsync(request); // Only interface methods</code></pre>
       <i class="fa-solid fa-chevron-down collapsible-chevron"></i>
     </div>
     <div class="collapsible-content"><div class="collapsible-body">
-      <p class="body-text">A single factory class contains a switch or if-else chain on a provider type enum to decide which concrete product to create. Every time a new provider is added, this single file must be modified. This is the procedural approach mistaken for the Factory Method pattern — it offers no polymorphism benefit.</p>
+      <p class="body-text">A single factory class contains a switch or if-else chain on a provider type enum to decide which concrete product to create with <code>new ConcreteType()</code>. Every time a new provider is added, this single file must be modified. This is the procedural approach mistaken for the Factory Method pattern — it offers no polymorphism benefit. <strong>Important clarification:</strong> the anti-pattern is coupling to <code>new ConcreteType()</code> inside the switch — NOT key-based lookup itself. DI keyed services (e.g., <code>GetKeyedService&lt;T&gt;(key)</code>) delegate creation to the container, keeping the factory decoupled from concrete types.</p>
       <div class="callout callout-danger">
         <div class="callout-title"><i class="fa-solid fa-skull"></i> Why This Is Bad</div>
         <ul class="styled red">
@@ -3660,6 +3936,8 @@ services.AddSingleton&lt;IPaymentFactory, PaymentFactory&gt;();</code></pre>
     {
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService&lt;AppDbContext&gt;();
+        // DbContext is only used to READ config — not retained by the processor.
+        // The scope is disposed immediately after, releasing the connection.
         return new StripePaymentProcessor(db.Settings.ApiKey);
     }
 }</code></pre>
@@ -3748,7 +4026,10 @@ public class StripePaymentFactory : PaymentFactory
         return processor;
     }
     protected abstract IPaymentProcessor CreateProcessor();
-}</code></pre>
+}
+// In production, configure appsettings.json to set the factory
+// category to Warning level — Debug lines are only emitted in
+// dev/staging. This prevents log volume explosion at scale.</code></pre>
         </div>
       </div>
     </div></div>
@@ -3825,11 +4106,11 @@ public class PayPalPaymentFactory : PaymentFactory { ... }</code></pre>
       <div class="cheat-card-title"><i class="fa-solid fa-sitemap" style="color:var(--accent-purple)"></i> Structure</div>
       <div style="font-size:0.75rem;line-height:1.7;background:rgba(0,0,0,0.3);border-radius:0.5rem;padding:1rem;font-family:'JetBrains Mono',monospace;color:#a5f3fc;">
         <div style="color:#c678dd;">«abstract» Creator</div>
-        <div style="padding-left:0.75rem;">+ <span style="color:#61afef;">FactoryMethod</span>(): IProduct</div>
+        <div style="padding-left:0.75rem;">+ <span style="color:#61afef;">FactoryMethod</span>() (e.g. CreateProcessor()): IProduct</div>
         <div style="padding-left:0.75rem;">+ <span style="color:#61afef;">SomeOperation</span>()</div>
         <div style="color:var(--text-muted);padding:0.25rem 0 0.25rem 1rem;">▲ extends</div>
         <div style="color:#c678dd;">ConcreteCreator</div>
-        <div style="padding-left:0.75rem;">+ <span style="color:#61afef;">FactoryMethod</span>(): IProduct</div>
+        <div style="padding-left:0.75rem;">+ <span style="color:#61afef;">FactoryMethod</span>() (e.g. CreateProcessor()): IProduct</div>
         <div style="border-top:1px solid rgba(255,255,255,0.1);margin:0.5rem 0;"></div>
         <div style="color:#c678dd;">«interface» IProduct</div>
         <div style="padding-left:0.75rem;">+ <span style="color:#61afef;">Use</span>()</div>
@@ -3887,6 +4168,7 @@ services.AddScoped&lt;IPaymentFactory, StripePaymentFactory&gt;();</code></pre>
         <li><strong>Factory</strong> — Register as <strong>Singleton</strong> if stateless (no mutable fields). Stateless factories are inherently thread-safe.</li>
         <li><strong>Product</strong> — Register as <strong>Transient</strong> (per-use). A new instance per call eliminates shared-state races.</li>
         <li><strong>Beware captive dependencies</strong> — Singleton factory + Scoped DbContext = <code>ObjectDisposedException</code> under load. Use <code>IServiceScopeFactory</code>.</li>
+        <li><strong>ConcurrentDictionary registries</strong> — Factories backed by <code>ConcurrentDictionary&lt;string, Func&lt;IProduct&gt;&gt;</code> are Singleton-safe — concurrent reads/writes are thread-safe without locks.</li>
       </ul>
     </div>
 
@@ -3933,16 +4215,18 @@ services.AddScoped&lt;IPaymentFactory, StripePaymentFactory&gt;();</code></pre>
       <div class="mermaid">
 flowchart TD
     START(["Need a new payment provider?"]) --> A["Create ConcreteProduct\nimplementing IPaymentProcessor\n(e.g. ApplePayProcessor.cs)"]
-    A --> B["Create ConcreteFactory\nextending PaymentFactory\n(e.g. ApplePayFactory.cs)"]
-    B --> C["Register in DI\nservices.AddScoped&lt;IPaymentFactory,\nApplePayFactory&gt;()"]
+    A --> B["Create ConcreteCreator\nextending PaymentProcessorFactory\n(e.g. ApplePayProcessorFactory.cs)"]
+    B --> C["Register in DI\nAddKeyedSingleton&lt;PaymentProcessorFactory,\nApplePayProcessorFactory&gt;\n(PaymentProvider.ApplePay)"]
     C --> D["Write unit test\nfor ApplePayFactory.CreateProcessor()"]
-    D --> DONE(["Done ✓\nZero existing files modified"])
+    D --> E["Run startup validator\nto verify registration"]
+    E --> DONE(["Done ✓\nZero existing files modified"])
 
     style START fill:#0f3460,stroke:#3b82f6,color:#f1f5f9
     style A fill:#064e3b,stroke:#10b981,color:#f1f5f9
     style B fill:#064e3b,stroke:#10b981,color:#f1f5f9
     style C fill:#1e1b4b,stroke:#8b5cf6,color:#f1f5f9
     style D fill:#1a2e1a,stroke:#22c55e,color:#f1f5f9
+    style E fill:#1e1b4b,stroke:#a78bfa,color:#f1f5f9
     style DONE fill:#0c4a6e,stroke:#06b6d4,color:#f1f5f9
       </div>
     </div>

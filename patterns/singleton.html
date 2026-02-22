@@ -431,30 +431,33 @@ classDiagram
       </div>
     </div>
     <div>
-      <h3 class="sub">UML Diagram B — ConnectionPoolManager</h3>
+      <h3 class="sub">UML Diagram B — DI-Managed Singleton (Modern Approach)</h3>
       <div class="mermaid-container"><span class="diagram-hint"><i class="fa-solid fa-up-down-left-right"></i> Scroll &amp; pinch to zoom</span>
         <div class="mermaid">
 classDiagram
-    class ConnectionPoolManager {
-        &lt;&lt;Singleton&gt;&gt;
-        -Lazy~ConnectionPoolManager~ _lazy$
-        -ConcurrentQueue~DbConnection~ _pool
-        -int _maxSize
-        -ConnectionPoolManager()
-        +ConnectionPoolManager Instance$
-        +Rent() DbConnection
-        +Return(conn) void
-        +PoolSize int
+    class ISingletonService {
+        &lt;&lt;interface&gt;&gt;
+        +DoWork(input) Result
+        +GetState() State
     }
-    class OrderService {
-        +PlaceOrderAsync(order) Task
+    class SingletonServiceImpl {
+        -_state ConcurrentDictionary
+        -_logger ILogger
+        +DoWork(input) Result
+        +GetState() State
     }
-    class InventoryService {
-        +GetStockAsync(sku) Task~int~
+    class ConsumerA {
+        -_service ISingletonService
+        +Execute() Task
     }
-    OrderService --> ConnectionPoolManager : uses Instance
-    InventoryService --> ConnectionPoolManager : uses Instance
-    note for ConnectionPoolManager "Both services share the SAME pool\nTwo pools = 2x connections = DB overload"
+    class ConsumerB {
+        -_service ISingletonService
+        +Process() Task
+    }
+    ISingletonService &lt;|.. SingletonServiceImpl : implements
+    ConsumerA --> ISingletonService : injected via DI
+    ConsumerB --> ISingletonService : injected via DI
+    note for SingletonServiceImpl "Registered once: AddSingleton~ISingletonService, SingletonServiceImpl~()\nDI container guarantees exactly ONE instance\nBoth consumers receive the SAME object"
         </div>
       </div>
     </div>
@@ -465,8 +468,8 @@ classDiagram
   <div class="mermaid-container"><span class="diagram-hint"><i class="fa-solid fa-up-down-left-right"></i> Scroll &amp; pinch to zoom</span>
     <div class="mermaid">
 sequenceDiagram
-    participant T1 as Thread 1 (OrderService)
-    participant T2 as Thread 2 (InventoryService)
+    participant T1 as Thread 1 (Consumer A)
+    participant T2 as Thread 2 (Consumer B)
     participant S as Singleton.Instance
     participant L as _lock object
 
@@ -490,106 +493,175 @@ sequenceDiagram
     </div>
   </div>
 
-  <h3 class="sub">ConnectionPoolManager — Full Implementation</h3>
-  <div class="macos-window">
-    <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ConnectionPoolManager.cs</span></div>
-    <div class="macos-body"><pre><code class="language-csharp">public sealed class ConnectionPoolManager
+  <h3 class="sub">Singleton — All 4 Canonical Implementations</h3>
+  <div class="tab-container">
+    <div class="tab-header">
+      <button class="tab-btn active" data-tab="s4-naive">Approach 1: Naive (Broken)</button>
+      <button class="tab-btn" data-tab="s4-dcl">Approach 2: Double-Checked Locking</button>
+      <button class="tab-btn" data-tab="s4-lazy">Approach 3: Lazy&lt;T&gt;</button>
+      <button class="tab-btn" data-tab="s4-di">Approach 4: DI Container (Modern)</button>
+    </div>
+    <div class="tab-panel active" data-panel="s4-naive">
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">NaiveSingleton.cs — NOT THREAD-SAFE</span></div>
+        <div class="macos-body"><pre><code class="language-csharp">// ❌ BROKEN: Race condition when two threads call Instance simultaneously
+public sealed class NaiveSingleton
 {
-    // Lazy&lt;T&gt; with ExecutionAndPublication guarantees thread-safe single init
-    private static readonly Lazy&lt;ConnectionPoolManager&gt; _lazy =
-        new(() =&gt; new ConnectionPoolManager(), LazyThreadSafetyMode.ExecutionAndPublication);
+    private static NaiveSingleton? _instance;
 
-    private readonly ConcurrentQueue&lt;DbConnection&gt; _pool = new();
-    private readonly int _maxSize;
-    private readonly string _connectionString;
-    private volatile int _currentSize = 0;
+    private NaiveSingleton() { }
 
-    // Private constructor — no external instantiation
-    private ConnectionPoolManager()
+    public static NaiveSingleton Instance
     {
-        _connectionString = Environment.GetEnvironmentVariable("DB_CONN")
-            ?? throw new InvalidOperationException("DB_CONN env var not set");
-        _maxSize = 20;
-
-        // Pre-warm with 5 connections
-        for (int i = 0; i &lt; 5; i++)
-            _pool.Enqueue(CreateConnection());
-        _currentSize = 5;
-    }
-
-    public static ConnectionPoolManager Instance =&gt; _lazy.Value;
-    public int PoolSize =&gt; _pool.Count;
-
-    public DbConnection Rent()
-    {
-        if (_pool.TryDequeue(out var connection))
-            return connection;
-
-        if (_currentSize &lt; _maxSize)
+        get
         {
-            Interlocked.Increment(ref _currentSize);
-            return CreateConnection();
+            // Thread A checks: _instance == null → YES
+            // Thread B checks: _instance == null → YES (before A assigns!)
+            // Result: TWO instances created — singleton contract broken
+            if (_instance == null)
+                _instance = new NaiveSingleton();
+            return _instance;
         }
-
-        throw new InvalidOperationException("Connection pool exhausted.");
     }
 
-    public void Return(DbConnection connection)
-    {
-        ArgumentNullException.ThrowIfNull(connection);
-        if (connection.State != ConnectionState.Open)
-        {
-            Interlocked.Decrement(ref _currentSize);
-            return;
-        }
-        _pool.Enqueue(connection);
-    }
-
-    private DbConnection CreateConnection()
-    {
-        var conn = new SqlConnection(_connectionString);
-        conn.Open();
-        return conn;
-    }
+    public string DoWork(string input) =&gt; $"Processed: {input}";
 }
 
-// Services using the Singleton pool
-public class OrderService
+// Why this breaks:
+// 1. No memory barrier — Thread B may not see Thread A's write
+// 2. No mutual exclusion — both threads enter the if-block
+// 3. No atomicity — check + assign is two operations, not one</code></pre></div>
+      </div>
+    </div>
+    <div class="tab-panel" data-panel="s4-dcl">
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DclSingleton.cs — Thread-Safe (Classic)</span></div>
+        <div class="macos-body"><pre><code class="language-csharp">// ✅ Thread-safe via double-checked locking
+// Use when you need explicit control over initialization logic
+public sealed class DclSingleton
 {
-    public async Task PlaceOrderAsync(Order order)
+    private static volatile DclSingleton? _instance;
+    private static readonly object _lock = new();
+
+    private DclSingleton()
     {
-        var conn = ConnectionPoolManager.Instance.Rent();
-        try
+        // Expensive initialization goes here
+        // This runs EXACTLY once, even under contention
+    }
+
+    public static DclSingleton Instance
+    {
+        get
         {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "INSERT INTO Orders ...";
-            await cmd.ExecuteNonQueryAsync();
-        }
-        finally
-        {
-            ConnectionPoolManager.Instance.Return(conn);
+            // First check — fast path (no lock needed after init)
+            if (_instance != null) return _instance;
+
+            lock (_lock)
+            {
+                // Second check — inside lock prevents duplicate creation
+                // Thread B enters lock AFTER Thread A constructed → sees non-null
+                _instance ??= new DclSingleton();
+            }
+            return _instance;
         }
     }
+
+    public string DoWork(string input) =&gt; $"Processed: {input}";
 }
 
-public class InventoryService
+// volatile keyword ensures:
+// 1. Writes are visible to all threads immediately (memory barrier)
+// 2. Prevents instruction reordering around the field
+// Without volatile: Thread B could read a partially-constructed object</code></pre></div>
+      </div>
+    </div>
+    <div class="tab-panel" data-panel="s4-lazy">
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">LazySingleton.cs — Thread-Safe (Recommended for Libraries)</span></div>
+        <div class="macos-body"><pre><code class="language-csharp">// ✅ Thread-safe via Lazy&lt;T&gt; — preferred for self-managed singletons
+// Framework handles ALL locking internally
+public sealed class LazySingleton
 {
-    public async Task&lt;int&gt; GetStockAsync(string sku)
+    // LazyThreadSafetyMode.ExecutionAndPublication:
+    //   - Only ONE thread executes the factory
+    //   - All other threads block until the value is ready
+    //   - If factory throws, next call retries (exception is NOT cached)
+    private static readonly Lazy&lt;LazySingleton&gt; _lazy =
+        new(() =&gt; new LazySingleton(),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
+    private LazySingleton()
     {
-        var conn = ConnectionPoolManager.Instance.Rent(); // Same pool!
-        try
-        {
-            using var cmd = conn.CreateCommand();
-            cmd.CommandText = "SELECT Stock FROM Inventory WHERE SKU = @sku";
-            cmd.Parameters.AddWithValue("@sku", sku);
-            return (int)(await cmd.ExecuteScalarAsync())!;
-        }
-        finally
-        {
-            ConnectionPoolManager.Instance.Return(conn);
-        }
+        // Expensive initialization goes here
+        // Guaranteed to run exactly once
     }
-}</code></pre></div>
+
+    public static LazySingleton Instance =&gt; _lazy.Value;
+
+    // Check if instance has been created without triggering creation
+    public static bool IsCreated =&gt; _lazy.IsValueCreated;
+
+    public string DoWork(string input) =&gt; $"Processed: {input}";
+}
+
+// Why Lazy&lt;T&gt; is better than manual DCL:
+// 1. No volatile field — Lazy handles memory barriers internally
+// 2. No lock object — Lazy manages its own synchronization
+// 3. No double-check pattern — Lazy encapsulates the logic
+// 4. Exception handling — configurable retry on factory failure</code></pre></div>
+      </div>
+    </div>
+    <div class="tab-panel" data-panel="s4-di">
+      <div class="macos-window">
+        <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">DiSingleton.cs — DI Container (Modern Best Practice)</span></div>
+        <div class="macos-body"><pre><code class="language-csharp">// ✅ Modern approach: DI container manages the singleton lifetime
+// The class itself has NO static state — it's just a normal class
+// Simple record to expose internal state (read-only snapshot)
+public record ServiceState(IReadOnlyDictionary&lt;string, int&gt; Counts);
+
+public interface ISingletonService
+{
+    string DoWork(string input);
+    ServiceState GetState();
+}
+
+public sealed class SingletonService : ISingletonService
+{
+    private readonly ILogger&lt;SingletonService&gt; _logger;
+    private readonly ConcurrentDictionary&lt;string, int&gt; _state = new();
+
+    // Normal constructor injection — NOT private
+    // DI container ensures only ONE instance is ever created
+    public SingletonService(ILogger&lt;SingletonService&gt; logger)
+    {
+        _logger = logger;
+        _logger.LogInformation("SingletonService created (this runs once)");
+    }
+
+    public string DoWork(string input)
+    {
+        _state.AddOrUpdate(input, 1, (_, count) =&gt; count + 1);
+        return $"Processed: {input} (call #{_state[input]})";
+    }
+
+    public ServiceState GetState() =&gt;
+        new(_state.ToDictionary(kv =&gt; kv.Key, kv =&gt; kv.Value));
+}
+
+// --- Registration (Program.cs) ---
+// builder.Services.AddSingleton&lt;ISingletonService, SingletonService&gt;();
+//
+// --- Consumer classes receive the SAME instance via DI ---
+// public class ConsumerA(ISingletonService svc) { ... }
+// public class ConsumerB(ISingletonService svc) { ... }
+//
+// Why DI Singleton is the modern best practice:
+// 1. Testable — inject a mock ISingletonService in unit tests
+// 2. No static state — class is unaware it's a singleton
+// 3. Constructor injection — dependencies are explicit
+// 4. Lifetime managed externally — easy to change to Scoped/Transient</code></pre></div>
+      </div>
+    </div>
   </div>
 
   <div class="card">
@@ -697,7 +769,7 @@ public class OrderService
     public OrderService(IConfigService config) =&gt; _config = config;
     public void ProcessOrder()
     {
-        var connStr = _config.Get("Database:ConnectionString");
+        var connectionString = _config.Get("Database:ConnectionString");
     }
 }</code></pre></div>
       </div>
@@ -767,7 +839,8 @@ public class PaymentService
       <div class="vs-badge">VS</div>
       <div class="comparison-panel good">
         <div class="comparison-header"><i class="fa-solid fa-circle-check"></i> Senior Approach</div>
-        <div class="macos-body"><pre><code class="language-csharp">// Step 1: Configure Serilog Singleton at startup
+        <div class="macos-body"><pre><code class="language-csharp">// Program.cs — startup
+// Step 1: Configure Serilog Singleton at startup
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Information()
     .Enrich.WithProperty("Application", "PaymentAPI")
@@ -1026,7 +1099,7 @@ public class OrderController : ControllerBase
     public OrderController(IMetricsService metrics) =&gt; _metrics = metrics;
 
     [HttpPost("orders")]
-    public async Task&lt;IActionResult&gt; CreateOrder([FromBody] OrderDto dto)
+    public async Task&lt;IActionResult&gt; CreateOrder([FromBody] OrderDto dto) // OrderDto: your application's request model
     {
         var sw = Stopwatch.StartNew();
         _metrics.Increment("orders.created");
@@ -1047,6 +1120,7 @@ public class OrderController : ControllerBase
           <tr><td><span class="badge badge-purple">Eager Static</span></td><td>✅ CLR-guaranteed</td><td>⚠️ Partial</td><td>❌</td><td>❌</td><td>Immutable, always-needed data</td></tr>
         </tbody>
       </table>
+      <p style="font-size:0.8rem;color:var(--text-muted);margin-top:0.5rem;">⚠️ Partial testability = instance is accessible via static property, so tests can use the real Singleton but cannot swap it for a mock. Full testability requires interface-based DI injection.</p>
     </div>
   </div>
 </section>
@@ -1063,14 +1137,21 @@ public class OrderController : ControllerBase
     <div class="card-title"><i class="fa-solid fa-1" style="color:var(--accent-red)"></i> Bug #1 — Captive Dependency (Singleton holding Scoped DbContext)</div>
     <div class="callout callout-danger">
       <div class="callout-title"><i class="fa-solid fa-skull-crossbones"></i> Business Impact: $23,000 in lost transactions</div>
-      An e-commerce Singleton OrderProcessor captured a Scoped DbContext at construction time. After the first request completed and the scope was disposed, the captured DbContext became invalid. All subsequent requests failed with ObjectDisposedException. The bug ran undetected for 4 hours during a weekend sale event.
+      An e-commerce Singleton OrderProcessor captured a Scoped DbContext at construction time. Because the Singleton lives in the root scope (which is never disposed), the captured DbContext was never disposed either — it stayed alive but became stale. Its change tracker accumulated entities across requests, queries returned outdated cached data, and connections were never returned to the pool. The bug ran undetected for 4 hours during a weekend sale event until the connection pool was exhausted and all new requests started timing out.
     </div>
     <h3 class="sub">Setup — The Captive Dependency Anti-Pattern</h3>
-    <div class="macos-window">
-      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OrderProcessor.cs — BROKEN</span></div>
-      <div class="macos-body"><pre><code class="language-csharp">// WRONG: Singleton captures a Scoped service!
-// The Scoped DbContext is disposed after the first request.
-// All subsequent calls use a disposed context — ObjectDisposedException!
+    <div class="tab-container">
+      <div class="tab-header">
+        <button class="tab-btn active" data-tab="bug1-broken">OrderProcessor.cs — BROKEN</button>
+        <button class="tab-btn" data-tab="bug1-dbcontext">ApplicationDbContext.cs</button>
+      </div>
+      <div class="tab-panel active" data-panel="bug1-broken">
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">OrderProcessor.cs — BROKEN</span></div>
+          <div class="macos-body"><pre><code class="language-csharp">// WRONG: Singleton captures a Scoped service!
+// DI resolves DbContext from the ROOT scope (not request scope).
+// Root-scope DbContext is never disposed per-request — BUT it holds
+// a single stale connection for the ENTIRE app lifetime.
 public class OrderProcessor  // Singleton lifetime
 {
     private readonly ApplicationDbContext _dbContext;  // Scoped lifetime!
@@ -1085,12 +1166,38 @@ public class OrderProcessor  // Singleton lifetime
 
     public async Task ProcessOrderAsync(Order order)
     {
-        // After request 1 completes: DbContext is disposed
-        // Request 2 reaches here: ObjectDisposedException!
+        // Root-scope DbContext stays alive but its connection goes stale
+        // After hours: connection times out, pool exhausted → crash
         _dbContext.Orders.Add(order);
         await _dbContext.SaveChangesAsync();
     }
 }</code></pre></div>
+        </div>
+      </div>
+      <div class="tab-panel" data-panel="bug1-dbcontext">
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ApplicationDbContext.cs</span></div>
+          <div class="macos-body"><pre><code class="language-csharp">// Scoped DbContext — designed to live for ONE request
+// When captured by a Singleton, it outlives its intended scope
+public class ApplicationDbContext : DbContext
+{
+    public ApplicationDbContext(DbContextOptions&lt;ApplicationDbContext&gt; options)
+        : base(options) { }
+
+    public DbSet&lt;Order&gt; Orders =&gt; Set&lt;Order&gt;();
+    public DbSet&lt;Product&gt; Products =&gt; Set&lt;Product&gt;();
+    public DbSet&lt;Customer&gt; Customers =&gt; Set&lt;Customer&gt;();
+
+    // EF Core tracks entities in-memory per DbContext instance.
+    // A long-lived DbContext accumulates stale tracked entities,
+    // increasing memory usage and causing subtle data bugs.
+}
+
+// Registration — Scoped by default
+builder.Services.AddDbContext&lt;ApplicationDbContext&gt;(options =&gt;
+    options.UseSqlServer(connectionString));</code></pre></div>
+        </div>
+      </div>
     </div>
     <h3 class="sub">Timeline of Failure</h3>
     <div class="table-wrapper">
@@ -1173,9 +1280,16 @@ builder.Host.UseDefaultServiceProvider(options =&gt;
       <div class="callout-title"><i class="fa-solid fa-skull-crossbones"></i> Business Impact: $1.2M — Production OOM Crash</div>
       An ML inference service loaded a 400MB model in a naive Singleton. On deployment, 50 threads simultaneously hit the Instance property during the first burst of traffic. 50 threads each saw <code>_instance == null</code> and started loading the model. 50 x 400MB = 20GB allocated simultaneously. The pod crashed with OOM. Kubernetes entered CrashLoopBackOff. The service was down for 4 hours.
     </div>
-    <div class="macos-window">
-      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MLModelService.cs — BROKEN</span></div>
-      <div class="macos-body"><pre><code class="language-csharp">// NOT thread-safe — naive singleton with expensive initialization
+    <div class="tab-container">
+      <div class="tab-header">
+        <button class="tab-btn active" data-tab="bug2-broken">MLModelService.cs — BROKEN</button>
+        <button class="tab-btn" data-tab="bug2-fixed">MLModelService.cs — FIXED</button>
+        <button class="tab-btn" data-tab="bug2-warmup">MLModelWarmupService.cs</button>
+      </div>
+      <div class="tab-panel active" data-panel="bug2-broken">
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MLModelService.cs — BROKEN</span></div>
+          <div class="macos-body"><pre><code class="language-csharp">// NOT thread-safe — naive singleton with expensive initialization
 public class MLModelService
 {
     private static MLModelService? _instance;
@@ -1202,11 +1316,12 @@ public class MLModelService
 
     public float[] Predict(float[] input) =&gt; _model.Run(input);
 }</code></pre></div>
-    </div>
-    <h3 class="sub">Fix — Lazy&lt;T&gt; + IHostedService Warm-Up</h3>
-    <div class="macos-window">
-      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MLModelService.cs — FIXED</span></div>
-      <div class="macos-body"><pre><code class="language-csharp">// Thread-safe: Lazy&lt;T&gt; guarantees exactly one initialization
+        </div>
+      </div>
+      <div class="tab-panel" data-panel="bug2-fixed">
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MLModelService.cs — FIXED</span></div>
+          <div class="macos-body"><pre><code class="language-csharp">// Thread-safe: Lazy&lt;T&gt; guarantees exactly one initialization
 public sealed class MLModelService
 {
     private static readonly Lazy&lt;MLModelService&gt; _lazy =
@@ -1222,9 +1337,13 @@ public sealed class MLModelService
 
     public static MLModelService Instance =&gt; _lazy.Value;
     public float[] Predict(float[] input) =&gt; _model.Run(input);
-}
-
-// IHostedService warm-up: loads model BEFORE first request arrives
+}</code></pre></div>
+        </div>
+      </div>
+      <div class="tab-panel" data-panel="bug2-warmup">
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MLModelWarmupService.cs</span></div>
+          <div class="macos-body"><pre><code class="language-csharp">// IHostedService warm-up: loads model BEFORE first request arrives
 // This avoids the cold-start problem in production
 public class MLModelWarmupService : IHostedService
 {
@@ -1248,6 +1367,8 @@ public class MLModelWarmupService : IHostedService
 
 // Register warm-up service
 builder.Services.AddHostedService&lt;MLModelWarmupService&gt;();</code></pre></div>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1258,9 +1379,16 @@ builder.Services.AddHostedService&lt;MLModelWarmupService&gt;();</code></pre></d
       <div class="callout-title"><i class="fa-solid fa-skull-crossbones"></i> Business Impact: Cascading Production Failure</div>
       A Singleton cache using ConcurrentDictionary with string keys grew unboundedly over 3 months. The keys were user-specific URLs containing GUIDs — millions of unique keys. At 4.8GB heap, GC pauses hit 400ms. Response times spiked. Load balancer health checks timed out. Pods were terminated and restarted. During restart, traffic shifted to remaining pods — which also had 4.8GB heaps. All pods failed within minutes.
     </div>
-    <div class="macos-window">
-      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ProductCacheService.cs — BROKEN</span></div>
-      <div class="macos-body"><pre><code class="language-csharp">// Singleton cache with no eviction — grows forever!
+    <div class="tab-container">
+      <div class="tab-header">
+        <button class="tab-btn active" data-tab="bug3-broken">ProductCacheService.cs — BROKEN</button>
+        <button class="tab-btn" data-tab="bug3-interface">IProductCacheService.cs</button>
+        <button class="tab-btn" data-tab="bug3-fixed">ProductCacheService.cs — FIXED</button>
+      </div>
+      <div class="tab-panel active" data-panel="bug3-broken">
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ProductCacheService.cs — BROKEN</span></div>
+          <div class="macos-body"><pre><code class="language-csharp">// Singleton cache with no eviction — grows forever!
 public sealed class ProductCacheService
 {
     private static readonly Lazy&lt;ProductCacheService&gt; _lazy =
@@ -1281,11 +1409,33 @@ public sealed class ProductCacheService
         return _cache.GetOrAdd(cacheKey, _ =&gt; factory());
     }
 }</code></pre></div>
-    </div>
-    <h3 class="sub">Fix — IMemoryCache with SizeLimit and Expiration</h3>
-    <div class="macos-window">
-      <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ProductCacheService.cs — FIXED</span></div>
-      <div class="macos-body"><pre><code class="language-csharp">// Fix: Use IMemoryCache with bounded size and sliding expiration
+        </div>
+      </div>
+      <div class="tab-panel" data-panel="bug3-interface">
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">IProductCacheService.cs</span></div>
+          <div class="macos-body"><pre><code class="language-csharp">// Interface for the cache service — enables DI and testability
+// The BROKEN version above doesn't implement this interface (it's a
+// static Singleton). The FIXED version below uses DI + this interface.
+public interface IProductCacheService
+{
+    /// &lt;summary&gt;
+    /// Gets a product from cache, or creates it via the factory and caches the result.
+    /// &lt;/summary&gt;
+    /// &lt;param name="cacheKey"&gt;Unique cache key (e.g., product ID or URL)&lt;/param&gt;
+    /// &lt;param name="factory"&gt;Async factory to create the product if not cached&lt;/param&gt;
+    /// &lt;param name="cacheSizeUnits"&gt;Size units counted against SizeLimit (default: 1)&lt;/param&gt;
+    Task&lt;Product?&gt; GetOrAddAsync(
+        string cacheKey,
+        Func&lt;Task&lt;Product?&gt;&gt; factory,
+        int cacheSizeUnits = 1);
+}</code></pre></div>
+        </div>
+      </div>
+      <div class="tab-panel" data-panel="bug3-fixed">
+        <div class="macos-window">
+          <div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">ProductCacheService.cs — FIXED</span></div>
+          <div class="macos-body"><pre><code class="language-csharp">// Fix: Use IMemoryCache with bounded size and sliding expiration
 public class ProductCacheService : IProductCacheService
 {
     private readonly IMemoryCache _cache;
@@ -1342,6 +1492,8 @@ builder.Services.AddMemoryCache(options =&gt;
 });
 
 builder.Services.AddSingleton&lt;IProductCacheService, ProductCacheService&gt;();</code></pre></div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
@@ -1372,7 +1524,8 @@ public sealed class AppServices
     public void Log(string msg) =&gt; Console.WriteLine(msg);
 
     // Config
-    public string GetSetting(string key) =&gt; config[key];
+    private readonly Dictionary&lt;string, string&gt; _config = new();
+    public string GetSetting(string key) =&gt; _config[key];
 
     // Cache
     private Dictionary&lt;string, object&gt; _cache = new();
@@ -1464,7 +1617,10 @@ builder.Services.AddSingleton&lt;IStorageService, S3StorageService&gt;();</code>
     <div class="comparison-grid">
       <div class="comparison-panel bad">
         <div class="comparison-header"><i class="fa-solid fa-circle-xmark"></i> BEFORE — Static Access, Not Substitutable</div>
-        <div class="macos-body"><pre><code class="language-csharp">public class ReportService
+        <div class="macos-body"><pre><code class="language-csharp">// Simple data carrier for a generated report
+public record Report(string Path);
+
+public class ReportService
 {
     public Report Generate()
     {
@@ -1721,6 +1877,7 @@ flowchart TD
     <div class="callout callout-warning">
       <div class="callout-title"><i class="fa-solid fa-triangle-exclamation"></i> The Monostate Anti-Pattern</div>
       Monostate uses multiple instances that all share the same static state. It appears like regular classes (you use <code>new Monostate()</code>) but behaves like a Singleton. It combines the worst of both worlds: the complexity of instance management WITH shared global state. Avoid it — use a proper Singleton via DI instead.
+      <p style="font-size:0.8rem;margin-top:0.5rem;">Note: Static fields are excluded from JSON/XML serialization — serializing a Monostate instance produces an empty object, which can cause subtle data-loss bugs.</p>
     </div>
   </div>
 </section>
@@ -1749,8 +1906,15 @@ flowchart TD
       <div class="qa-think"><strong>How to think about it:</strong> Don't just memorize the textbook definition. Instead, tell a story: "Here's the problem I faced, and here's how Singleton solved it." Ask yourself: what goes wrong if you create TWO of this thing? Walk through that problem first, then explain how Singleton fixes it. Think about it like this — imagine you have a school where students are constantly asking "who is the principal?" If you could create multiple principals, the school would be chaos. Singleton is the rule that says: there can only be ONE principal, and everyone who asks gets the same person.</div>
       <p class="body-text"><strong>Answer:</strong> The Singleton pattern makes sure only ONE object of a class ever exists in your entire application — like having only one principal in a school. No matter who asks for it, they all get the same one. It solves two problems at once: (1) it stops your code from accidentally creating duplicate objects — because some objects MUST be unique, and (2) it makes that single object easy to reach from anywhere in your code, without having to pass it through every method call like a baton in a relay race.</p>
       <p class="body-text"><strong>When to use it:</strong> Use Singleton when having TWO copies of something would cause problems. For example: a connection pool (a collection of open database connections shared by everyone) — if you had two pools, one would be empty while the other is overloaded. An in-memory cache — if you had two caches, updating one wouldn't update the other, so different parts of your app see different data. A logger, a circuit breaker, a feature flag reader. The test is simple: "would two separate instances of this class cause bugs?"</p>
-      <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Singleton.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// The minimal modern Singleton in C#
-public sealed class ApplicationCache
+      <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">Singleton.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// Interface — enables DI and testability
+public interface IApplicationCache
+{
+    void Set(string key, object value);
+    bool TryGet(string key, out object? value);
+}
+
+// The minimal modern Singleton in C#
+public sealed class ApplicationCache : IApplicationCache
 {
     private static readonly Lazy&lt;ApplicationCache&gt; _lazy =
         new(() =&gt; new ApplicationCache());
@@ -1869,7 +2033,7 @@ var singleThread = new Lazy&lt;Service&gt;(
     private volatile IReadOnlyDictionary&lt;string, bool&gt; _flags
         = new Dictionary&lt;string, bool&gt;();
 
-    private readonly IFlagProvider _provider;
+    private readonly IFlagProvider _provider; // IFlagProvider: your remote flag source (LaunchDarkly, database, etc.)
     private readonly ILogger&lt;FeatureFlagService&gt; _logger;
     private Timer? _refreshTimer;
 
@@ -1900,8 +2064,9 @@ var singleThread = new Lazy&lt;Service&gt;(
         try
         {
             var newFlags = await _provider.GetAllFlagsAsync();
-            // Atomic reference swap — readers always see a complete snapshot
-            Volatile.Write(ref _flags, newFlags);
+            // Volatile write with memory barrier — readers always see a complete snapshot
+            // The volatile keyword on _flags ensures this write is visible to all threads
+            _flags = newFlags;
             _logger.LogDebug("Feature flags refreshed: {Count}", newFlags.Count);
         }
         catch (Exception ex)
@@ -1917,7 +2082,7 @@ var singleThread = new Lazy&lt;Service&gt;(
 
 builder.Services.AddSingleton&lt;FeatureFlagService&gt;();
 builder.Services.AddHostedService(p =&gt; p.GetRequiredService&lt;FeatureFlagService&gt;());</code></pre></div></div>
-      <div class="qa-great"><strong>What separates good from great:</strong> The clever trick in this design is replacing the entire dictionary at once instead of updating it entry by entry. Think of it like swapping out a whole menu board at a restaurant rather than changing individual items while customers are reading it. If you changed items one by one, a customer might see "Burger: $5" and then glance up a moment later and see "Burger: $8" — a confusing mix of old and new. By swapping the entire board atomically (all at once, instantly), every reader either sees the old complete menu or the new complete menu — never a half-updated mess. This is what <code>Volatile.Write</code> does — it swaps the reference to the whole dictionary in one safe operation. For mid-request consistency: at the start of each request, grab the current dictionary into a local variable and use that same variable throughout the whole request. This way, flags can't change mid-request.</div>
+      <div class="qa-great"><strong>What separates good from great:</strong> The clever trick in this design is replacing the entire dictionary at once instead of updating it entry by entry. Think of it like swapping out a whole menu board at a restaurant rather than changing individual items while customers are reading it. If you changed items one by one, a customer might see "Burger: $5" and then glance up a moment later and see "Burger: $8" — a confusing mix of old and new. By swapping the entire board atomically (all at once, instantly), every reader either sees the old complete menu or the new complete menu — never a half-updated mess. The <code>volatile</code> keyword on the <code>_flags</code> field provides this guarantee — it swaps the reference to the whole dictionary in one safe operation. For mid-request consistency: at the start of each request, grab the current dictionary into a local variable and use that same variable throughout the whole request. This way, flags can't change mid-request.</div>
     </div></div>
   </div>
 
@@ -2290,10 +2455,14 @@ public sealed class DatabaseSingleton
         return retryPolicy.Execute(() =&gt; new DatabaseSingleton());
     }
 
+    private static readonly string _connectionString =
+        Environment.GetEnvironmentVariable("DB_CONN")
+        ?? throw new InvalidOperationException("DB_CONN not set");
+
     private DatabaseSingleton()
     {
         // May throw SqlException if DB is not yet ready
-        using var conn = new SqlConnection(connStr);
+        using var conn = new SqlConnection(_connectionString);
         conn.Open(); // Throws if DB not ready
     }
 }</code></pre></div></div>
@@ -2551,7 +2720,9 @@ public class PaymentService
     public async Task&lt;string&gt; ChargeAsync(string payload)
     {
         using var client = new HttpClient(); // Creates new handler per call!
-        return await client.PostStringAsync("https://api.stripe.com", payload);
+        var response = await client.PostAsync("https://api.stripe.com",
+            new StringContent(payload, Encoding.UTF8, "application/json"));
+        return await response.Content.ReadAsStringAsync();
     }
 }
 
@@ -2567,7 +2738,7 @@ public class PaymentService
         // Handler rotated every 2 minutes for DNS freshness
         using var client = _factory.CreateClient("stripe");
         var response = await client.PostAsync("/v1/charges",
-            new StringContent(payload));
+            new StringContent(payload, Encoding.UTF8, "application/json"));
         return await response.Content.ReadAsStringAsync();
     }
 }
@@ -2635,7 +2806,51 @@ builder.Services.AddStackExchangeRedisCache(options =&gt;
       <div class="qa-think"><strong>How to think about it:</strong> A "cold start" is when the first user to arrive has to wait for something expensive to load before their request is processed. Think of it like a restaurant that only prepares the kitchen when the first customer walks in — they have to wait 10 minutes while the chef gets everything ready, while all subsequent customers walk into a fully ready kitchen. The solution: prepare the kitchen BEFORE opening the doors. Explain how to use <code>IHostedService</code> to do this preparation at startup, and how to use a Kubernetes readiness probe to keep the "door closed" until preparation is complete.</div>
       <p class="body-text"><strong>Anti-pattern — Lazy initialization on first request:</strong> <code>Lazy&lt;T&gt;</code> is perfect for delaying creation until first use. But if "first use" is a real user's request, that user waits 3 seconds for the ML model to load while everyone else watches a spinner. Even worse: if 50 users hit the app at the same time during startup, they might ALL trigger the initialization at once — a stampede that overwhelms the system. This is called a <strong>thundering herd</strong> problem.</p>
       <p class="body-text"><strong>Solution — IHostedService Warmup + Readiness Probe:</strong></p>
-      <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">WarmupService.cs</span></div><div class="macos-body"><pre><code class="language-csharp">public class MLModelWarmupService : IHostedService
+      <div class="tab-container">
+        <div class="tab-header">
+          <button class="tab-btn active" data-tab="q23-model">MLModelSingleton.cs</button>
+          <button class="tab-btn" data-tab="q23-warmup">MLModelWarmupService.cs</button>
+          <button class="tab-btn" data-tab="q23-health">MLReadinessCheck.cs</button>
+        </div>
+        <div class="tab-panel active" data-panel="q23-model">
+          <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MLModelSingleton.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// DI-managed Singleton — registered once, injected everywhere
+public sealed class MLModelSingleton
+{
+    private OnnxModel? _model;
+    private readonly SemaphoreSlim _loadLock = new(1, 1);
+
+    public bool IsLoaded =&gt; _model is not null;
+
+    // Thread-safe async initialization — called once during warmup
+    public async Task EnsureLoadedAsync(CancellationToken ct = default)
+    {
+        if (_model is not null) return;  // Fast path
+
+        await _loadLock.WaitAsync(ct);
+        try
+        {
+            if (_model is not null) return;  // Double-check inside lock
+            _model = await OnnxRuntime.LoadModelAsync("model.onnx", ct);
+        }
+        finally
+        {
+            _loadLock.Release();
+        }
+    }
+
+    public float[] Predict(float[] input)
+    {
+        if (_model is null)
+            throw new InvalidOperationException("Model not loaded. Call EnsureLoadedAsync first.");
+        return _model.Run(input);
+    }
+}
+
+// Registration
+builder.Services.AddSingleton&lt;MLModelSingleton&gt;();</code></pre></div></div>
+        </div>
+        <div class="tab-panel" data-panel="q23-warmup">
+          <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MLModelWarmupService.cs</span></div><div class="macos-body"><pre><code class="language-csharp">public class MLModelWarmupService : IHostedService
 {
     private readonly MLModelSingleton _model;
     private readonly ILogger&lt;MLModelWarmupService&gt; _logger;
@@ -2662,7 +2877,10 @@ builder.Services.AddStackExchangeRedisCache(options =&gt;
     public Task StopAsync(CancellationToken ct) =&gt; Task.CompletedTask;
 }
 
-// Readiness probe: reports "Healthy" only after warmup completes
+builder.Services.AddHostedService&lt;MLModelWarmupService&gt;();</code></pre></div></div>
+        </div>
+        <div class="tab-panel" data-panel="q23-health">
+          <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">MLReadinessCheck.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// Readiness probe: reports "Healthy" only after warmup completes
 public class MLReadinessCheck : IHealthCheck
 {
     private readonly MLModelSingleton _model;
@@ -2680,6 +2898,8 @@ public class MLReadinessCheck : IHealthCheck
 // Kubernetes readiness probe hits /health/ready
 // Traffic is NOT sent to pod until readiness probe returns 200
 // So: pod starts → model loads → readiness probe passes → traffic flows</code></pre></div></div>
+        </div>
+      </div>
       <div class="qa-great"><strong>What separates good from great:</strong> Understanding the difference between a <strong>liveness probe</strong> and a <strong>readiness probe</strong> in Kubernetes. A liveness probe asks: "is the app still alive and running?" If it fails, Kubernetes kills and restarts the pod — it's the "heartbeat" check. A readiness probe asks: "is this pod READY to receive user traffic?" If it fails, Kubernetes keeps the pod alive but removes it from the load balancer pool — no user requests reach it until it's ready. By making your readiness probe return "Unhealthy" while the ML model is loading, Kubernetes naturally holds all traffic away from that server during warmup. The moment the model finishes loading and your readiness probe returns "Healthy," Kubernetes automatically starts sending traffic. The result: ZERO cold starts ever reach users. The restaurant prepares the kitchen before opening the doors — customers only see a fully-ready kitchen.</div>
     </div></div>
   </div>
@@ -2703,9 +2923,9 @@ var circuitBreakerPolicy = Policy
     .CircuitBreakerAsync(
         exceptionsAllowedBeforeBreaking: 5,
         durationOfBreak: TimeSpan.FromMinutes(1),
-        onBreak: (ex, ts) =&gt; logger.LogWarning("Circuit OPEN for {Ts}", ts),
-        onReset: () =&gt; logger.LogInformation("Circuit RESET"),
-        onHalfOpen: () =&gt; logger.LogInformation("Circuit HALF-OPEN"));
+        onBreak: (ex, ts) =&gt; Console.WriteLine($"Circuit OPEN for {ts}"),
+        onReset: () =&gt; Console.WriteLine("Circuit RESET"),
+        onHalfOpen: () =&gt; Console.WriteLine("Circuit HALF-OPEN"));
 
 // Register the SAME policy instance as Singleton
 services.AddSingleton&lt;IAsyncPolicy&gt;(circuitBreakerPolicy);
@@ -2723,8 +2943,13 @@ public class PaymentGatewayClient
     }
 
     public async Task&lt;Receipt&gt; ChargeAsync(ChargeRequest req)
+    {
         // All callers share the same circuit state
-        =&gt; await _policy.ExecuteAsync(() =&gt; DoChargeAsync(req));
+        var response = await _policy.ExecuteAsync(
+            () =&gt; _client.PostAsJsonAsync("/v1/charges", req));
+        return await response.Content.ReadFromJsonAsync&lt;Receipt&gt;()
+            ?? throw new InvalidOperationException("Empty response");
+    }
 }</code></pre></div></div>
       <div class="qa-great"><strong>What separates good from great:</strong> Bringing up the multi-server (distributed) version of this problem without being asked. In a deployment with 5 servers, each server has its own Singleton circuit breaker with its own failure count. Server A might have hit 100 failures and opened its circuit (stopping calls to the broken service) — but Servers B through E each have their own counters and might be at only 20 failures, still happily sending requests to the broken external service. The system is far from protected. The fix: a Redis-backed circuit breaker where all servers read and write the failure count to a shared Redis key. When the failure count in Redis hits the threshold, ALL servers see the circuit as open simultaneously. Polly (the popular .NET resilience library) doesn't natively support this distributed pattern, but you can implement a custom Redis-backed strategy — or use it as a design discussion point to show you understand the limitations of in-process state for distributed systems.</div>
     </div></div>
@@ -2865,7 +3090,7 @@ public class CandidateTest
 
         // NO → Not needed: Validator, Mapper, EmailFormatter
         // Two validators always produce the same result — no shared state at risk
-        return false; // Pseudocode — evaluate per case
+        throw new NotImplementedException("Evaluate per service — this is a decision framework, not runnable code");
     }
 
     // Algorithm 2: Is the state truly global (not request-scoped)?
@@ -2877,7 +3102,7 @@ public class CandidateTest
 
         // ALSO CHECK: Is the state user-specific?
         // If yes → NEVER Singleton (cross-user data leakage)
-        return false; // Pseudocode — evaluate per case
+        throw new NotImplementedException("Evaluate per service — this is a decision framework, not runnable code");
     }
 }
 
@@ -2944,7 +3169,7 @@ public class CandidateTest
     <div class="collapsible-content"><div class="collapsible-body">
       <p class="body-text">A hand-rolled static Singleton accessed via <code>MySingleton.Instance</code> creates hidden global state. Unit tests cannot substitute a test double — the class is hardwired to use the concrete Singleton. Tests become order-dependent: state from test A bleeds into test B.</p>
       <div class="callout callout-danger"><div class="callout-title"><i class="fa-solid fa-skull"></i> Signs</div>
-        Tests pass individually but fail when run together. Tests behave differently in CI (which runs all tests) vs locally (which runs specific tests). You add <code>MySingleton._instance = null</code> hacks in test teardown.
+        Tests pass individually but fail when run together. Tests behave differently in CI (which runs all tests) vs locally (which runs specific tests). You add <code>internal static void ResetForTesting()</code> hacks or use reflection to set <code>_instance = null</code> in test teardown.
       </div>
       <div class="callout callout-success"><div class="callout-title"><i class="fa-solid fa-wrench"></i> Fix: DI + Interface</div>
         Register via <code>AddSingleton&lt;IService, Service&gt;()</code>. Inject <code>IService</code> into constructors. Tests inject <code>Mock&lt;IService&gt;</code>. Each test creates its own DI scope — no shared static state between tests.
@@ -3022,7 +3247,8 @@ public class CandidateTest
     <div class="collapsible-content"><div class="collapsible-body">
       <p class="body-text">Static Singleton state persists between test methods in the same test run. Test A populates the cache. Test B expects an empty cache but finds Test A's data. Tests become order-dependent and fail intermittently in CI when test execution order differs from local.</p>
       <div class="macos-window"><div class="macos-titlebar"><span class="dot dot-red"></span><span class="dot dot-yellow"></span><span class="dot dot-green"></span><span class="macos-filename">TestIsolation.cs</span></div><div class="macos-body"><pre><code class="language-csharp">// Pattern 1: Use DI WebApplicationFactory in integration tests
-// Each test gets its own service scope — no shared static state
+// IClassFixture shares the factory instance across all tests in this class
+// — avoiding expensive startup per test while keeping test isolation via scopes
 public class OrderTests : IClassFixture&lt;WebApplicationFactory&lt;Program&gt;&gt;
 {
     private readonly WebApplicationFactory&lt;Program&gt; _factory;
@@ -3053,6 +3279,7 @@ public class OrderTests : IClassFixture&lt;WebApplicationFactory&lt;Program&gt;&
 public sealed class ConfigSingleton
 {
     private static ConfigSingleton? _instance;
+    // ⚠️ NOT thread-safe — acceptable only for test scenarios
     public static ConfigSingleton Instance =&gt; _instance ??= new();
 
     // Only for testing — resets shared state between tests
@@ -3096,7 +3323,7 @@ public sealed class ConfigSingleton
     </div>
     <div class="cheat-card">
       <div class="cheat-card-title">6. Lifetimes</div>
-      <div class="cheat-card-body">Singleton: 1 per app<br>Scoped: 1 per request<br>Transient: 1 per resolve<br><br>Singleton &gt; Scoped<br>= safe dependency<br>Scoped &gt; Singleton<br>= CAPTIVE BUG!</div>
+      <div class="cheat-card-body">Singleton: 1 per app<br>Scoped: 1 per request<br>Transient: 1 per resolve<br><br>Scoped → Singleton ✅<br>(safe: short uses long)<br>Singleton → Scoped ❌<br>CAPTIVE DEPENDENCY!</div>
     </div>
     <div class="cheat-card">
       <div class="cheat-card-title">7. Options in Singletons</div>
